@@ -1,0 +1,159 @@
+---
+title: "PNAS_Delivery"
+author: "BJC"
+date: "May 15, 2015"
+output: html_document
+---
+
+Initialize:
+```{r init, message=FALSE}
+library("phyloseq"); packageVersion("phyloseq")
+library("ggplot2"); packageVersion("ggplot2")
+library("gridExtra")
+library("igraph"); packageVersion("igraph")
+set.seed(100)
+default.par <- par(no.readonly = TRUE)
+options(stringsAsFactors = FALSE)
+theme_set(theme_bw())
+```
+
+Load data:
+```{r load-data, message=FALSE}
+###This supposes all files have been downloaded to
+###a pregnancy folder just under the user's main directory
+setwd("~/Pregnancy")
+otu_file <- "PregnancyClosed15.RData"
+load(otu_file)
+```
+
+## Alpha-diversity Disruption after Delivery
+
+Let's look at alpha diveristy vs. time relative to delivery, with samples separated by whether they are collected before or after delivery status. Also perform a paired Wilcoxon test for a significant change in diversity after delivery:
+```{r fig5}
+g_lmes <- list()
+g_lms <- list()
+s_lms <- list()
+s_lmes <- list()
+disp <- list(Vaginal_Swab="Vagina", Saliva="Saliva", Stool="Stool", Tooth_Gum="Tooth/Gum")
+for(site in sites) {
+  # Estimate diversity and make data frame
+  ps <- PSbs[[site]]
+  ps <- prune_samples(sample_data(ps)$GWColl >= 10, ps)
+  ps <- prune_samples(sample_data(ps)$GWColl <= 80, ps)
+  pptab <- table(sample_data(ps)$SubjectID, sample_data(ps)$PostPreg)>0
+  keep <- (pptab[,1] & pptab[,2])
+  keep <- names(keep[keep])
+  ps <- prune_samples(sample_data(ps)$SubjectID %in% keep, ps)
+  sample_data(ps)$WeeksRelDel <- sample_data(ps)$GWColl - sample_data(ps)$GWDel
+  erDF <- estimate_richness(ps, split = TRUE, measures = c("Shannon"))
+  df <- data.frame(erDF, sample_data(ps))
+  
+  # LM modeling/plotting
+  p <- ggplot(df, aes(x = WeeksRelDel, y = Shannon, color=PostPreg))
+  p <- p + geom_point(size=0.5, color="black", na.rm = TRUE)
+  #p <- p + theme(axis.text.x = element_text(angle = -90, vjust = 0.5, 
+  #                                         hjust = 0))
+  p = p + ylab("Shannon index")
+  #p = p + facet_wrap(~variable, nrow = nrow, scales = scales)
+  p <- p + xlab("Time relative to delivery (weeks)")
+  p <- p + ylim(0, 4.5)
+  p <- p + guides(color=FALSE)
+  p <- p + geom_vline(x_intercept=0, linetype="dashed")
+  p <- p + theme(axis.title.x = element_text(size=8),
+                axis.title.y = element_text(size=8),
+                axis.text.x = element_text(size=7),
+                axis.text.y = element_text(size=7),
+                plot.title = element_text(size=8),
+                plot.margin=unit(c(0,1.7,0,1.7),"mm"))
+  g_lms[[site]] <- p + stat_smooth(method="lm") + ggtitle(disp[[site]])
+  
+  # Keep the samples immediately before and after delivery
+  subdfs <- split(df, df$SubjectID)
+  subs <- names(subdfs)
+  
+  for(sub in subs) {
+    subdf <- subdfs[[sub]]
+    if((sum(subdf$GWColl > subdf$GWDel) == 0) || (sum(subdf$GWColl < subdf$GWDel) == 0)) {
+      subdfs[[sub]] <- NULL
+    } else {
+      # Keep sample before and after delivery
+      before <- which(subdf$GDColl == max(subdf$GDColl[subdf$GDColl < subdf$GDDel]))
+      after <- which(subdf$GDColl == min(subdf$GDColl[subdf$GDColl > subdf$GDDel]))
+      subdfs[[sub]] <- subdf[c(before, after),]
+    }
+  }
+  # Combine the subdfs back together
+  dfba <- do.call(rbind,subdfs)
+  Utest <- wilcox.test(dfba[!dfba$PostPreg,"Shannon"], dfba[dfba$PostPreg, "Shannon"], paired=T)
+  print(site)
+  print(Utest)
+}
+library("gridExtra")
+do.call(grid.arrange,c(g_lms, nrow=2))  # FIGURE 5
+Fig5 <- do.call(arrangeGrob, c(g_lms, nrow=2))  # FIGURE 5
+##To save a pdf version.
+#ggsave(Fig5, file = "PregPNAS_Fig5.pdf", width=8.45, height=7, units=c("cm"))
+```
+
+Look at difference for vaginal community between Csection/Traditional delivery:
+```{r see-Csect}
+for(site in sites) {
+  ps <- PSbs[[site]]
+  ps <- prune_samples(sample_data(ps)$GWColl >= 10, ps)
+  ps <- prune_samples(sample_data(ps)$GWColl <= 80, ps)
+  pptab <- table(sample_data(ps)$SubjectID, sample_data(ps)$PostPreg)>0
+  keep <- (pptab[,1] & pptab[,2])
+  keep <- names(keep[keep])
+  ps <- prune_samples(sample_data(ps)$SubjectID %in% keep, ps)
+  
+  sample_data(ps)$WeeksRelDel <- sample_data(ps)$GWColl - sample_data(ps)$GWDel
+  sample_data(ps)$DeliveryType <- c("Vaginal")
+  sample_data(ps)[sample_data(ps)$CSection,"DeliveryType"] <- c("C-Section")
+  
+  erDF <- estimate_richness(ps, split = TRUE, measures = c("Shannon"))
+  df <- data.frame(erDF, sample_data(ps))
+  
+  # LM modeling/plotting
+  p <- ggplot(df, aes(x = WeeksRelDel, y = Shannon, color=PostPreg))
+  p <- p + geom_point(color="black", size=1, na.rm = TRUE)
+  #p <- p + theme(axis.text.x = element_text(angle = -90, vjust = 0.5, 
+  #                                         hjust = 0))
+  p = p + ylab("Alpha-diversity (Shannon)")
+  #p = p + facet_wrap(~variable, nrow = nrow, scales = scales)
+  p <- p + xlab("Time relative to delivery (weeks)")
+  p <- p + ylim(0, 4.5)
+  p <- p + guides(color=FALSE)
+  p <- p + geom_vline(x_intercept=0, linetype="dashed")
+  p <- p + stat_smooth(method="lm")
+  print(p + facet_wrap(~DeliveryType))
+  print(paste(site, "Subject numbers"))
+  print(apply(table(sample_data(ps)$SubjectID, sample_data(ps)$DeliveryType) > 0, 2, sum))
+  #+ theme(title=element_text(size=rel(1.5)))
+}
+```
+
+```{r}
+ps <- PSbs[["Vaginal_Swab"]]
+ps <- prune_samples(sample_data(ps)$PostPreg, ps)
+foo <- table(sample_data(ps)$SubjectNice)
+foo
+ps <- prune_samples(sample_data(ps)$SubjectNice %in% names(foo)[foo>=3], ps)
+print(ps)
+
+erDF <- estimate_richness(ps, split = TRUE, measures = c("Shannon"))
+df <- data.frame(erDF, sample_data(ps))
+# Annoying re-ordering because @sample_data doesn't save ordered factors
+np <- 7; nm <- 5; nt <- 28
+df$SubjectNice <- ordered(df$SubjectNice, levels = paste0(c(rep("P", np), rep("M",nm), rep("T",nt)), c(seq(1,np), seq(1,nm), seq(1,nt))))
+df$WeeksPastDel <- df$GWColl - df$GWDel
+
+erDFpreg <- estimate_richness(PSPreg[["Vaginal_Swab"]], split = TRUE, measures = c("Shannon"))
+samdf <- data.frame(sample_data(PSPreg[["Vaginal_Swab"]]))
+pregdivs <- tapply(erDFpreg$Shannon, samdf$SubjectNice, mean)
+df$PregMeanShannon <- sapply(df$SubjectNice, function(x) pregdivs[[x]])
+#df$SubjectID <- ordered(df$SubjectID, levels = as.character(newnames))
+p <- ggplot(df, aes(x=WeeksPastDel, y=Shannon))
+p <- p + geom_line() + facet_wrap(~SubjectNice)
+p <- p + geom_hline(aes(yintercept=PregMeanShannon), linetype="dashed")
+p + xlab("Time past delivery (weeks)") + ylab("Alpha-diversity (Shannon)")
+```

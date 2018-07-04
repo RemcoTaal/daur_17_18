@@ -1,0 +1,240 @@
+---
+title: "Case 1 'CALUX'"
+author: "<----------- YOUR NAME GOES HERE --------->"
+date: '`r Sys.Date()`'
+output:
+  html_document:
+    css: ./hp_r_course/exercises/exercises_style.css
+---
+
+```{r, root_1, include=FALSE}
+## defines the root of the project for later use
+require("rprojroot") || utils::install.packages("rprojroot")
+library(rprojroot)
+root <- find_root_file(criterion = is_rstudio_project)
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, 
+                      results = "hide", 
+                      warning = FALSE,
+                      message = FALSE, 
+                      error = FALSE, 
+                      fig.show = FALSE)
+```
+
+
+## Directions
+
+ _*Use ggplot2 syntaxis for all the figures in this case study*_
+
+ _*Use packages of the tidyverse, or any other package you think you need to solve the questions below*_ 
+ 
+ _*Use this Rmarkdown template to create a report adressing the assignment below*_ 
+ 
+ _*Hand in the assignment at the before the end of the final course day*_
+
+## Introduction
+For the assessment of carcinogenic potential of chemicals, animal testing required. Recently, we have performed a ring trial with two laboratories to acertain the predictive capacity of a reporter cell line to accurately classify chemicals on the basis of reporter signal (fluorescence).
+
+## The case assignment
+ 1) Create a github repository "case_1_calux" in your account.
+ 2) Read the data into R 
+ 3) Inspect the data 
+ 4) Describe mising values and the type of variables
+ 5) Generate at least 4 different graphs that describe the data.
+ 6) Answer the case questions below.
+ 7) Upload a rendered (github_document) and the Rmd file to you github account
+ 8) Sent the teacher an email with the link to the files
+ 
+## **TIPs**
+
+ - For this case you need to know about importing data in R. The file is csv format, remember to set the `na.strings`. Determine the delimiter used in the datafile. You can open the file in a text editor.
+ - Remember the programming rules: use `snake_case` fore all variables in the data and in your script.
+ - Use the syntax from the {tidyverse} as much a possible
+ - You are allowed to use google/stack overflow, whatever you can find to solve the questions
+ - All graphics must be made with {ggplot2}
+ - Remember {dplyr} to `select()`, `filter()`, `group_by()`, `mutate()` and `summarize()` data
+ - Check the type of each variable in the data. Do you need to change the variable type like `data$var_1 <- as.factor(data$var_1)`? 
+
+## Case questions
+
+Try to answer the next 4 questions:
+
+Graph 1) 
+How does the relationship between the chemicals (`$name`) and the `$p53_cyto_mec` variable look?
+
+Graph 2) 
+Can you plot the relationships between the `$class` variable and the `$p53.ifmax` variable for each `$laboratory`? 
+
+Graph 3) 
+Make a graph with facets that display only chemical sthat have an induction of mean `p53.ifmax` of above 5.0.
+ 
+Graph 4)
+Create a meaningful bar-graph for this data set. You can choose what to plot yourself
+
+ ## Review criteria
+ 
+ - Your code must provide the steps above in such a way that someone else can understand the code.
+ - Provide a clear description of what your code does
+ - Describe the graphs in your report. 
+ - Provide the complete code in a rendered Rmd (to HTML) file 
+ 
+## Case data
+Load the data from the data folder "//root/data/case_1_calux/"
+
+This folder contains two files: 
+
+`r pander::pander(list.files(paste0(root, "/data/case_1_calux/")))`
+
+The data for this case is in the file "zomw_calux_all_data.csv"
+
+You need to change the names of the variables to the "conventions" (e.g. `$p53_cyto_mec`) do this first after loading the data.
+```{r, echo=TRUE, results='markup'}
+library(tidyverse)
+data_path <- file.path(root, "data", "case_1_calux", "zonmw_calux_all_data.csv")
+prevalidation <- read_delim(data_path, 
+    na = "NA", delim = ";") 
+```
+
+## Adding row_id
+Remember "Data management" it is good idea to add a row id
+```{r}
+prevalidation <- prevalidation %>% 
+  mutate(row_id = c(1:nrow(prevalidation))) %>% select(row_id:Study)
+
+names(prevalidation) <- tolower(names(prevalidation)) 
+names(prevalidation)
+head(prevalidation)
+```
+
+## Change names of variables
+```{r}
+library(stringr)
+new_names <- str_replace_all(names(prevalidation), 
+                             pattern = "\\.", replacement = "_")
+new_names
+new_names <- str_replace_all(new_names, 
+                  pattern = " ", replacement = "_")
+new_names
+
+names(prevalidation) <- new_names
+names(prevalidation)
+```
+## Case question that will help you create the above 4 graphs:
+
+## 1) Geoms
+The chemicals tested were divided into 3 classes. This graph is about showing the realtionship btween the chemicals and the induction of p53. Can you think of a way to convey this information in a plot? What type or types of `geom_` will you use?
+
+## 2) The variables in the data
+Which variable types are represented in the data. You can find more information in the "variables_calux.md" file.
+Change the type of the variable if necessary. 
+```{r}
+library(forcats)
+?forcats
+str(prevalidation)
+## change type of variables
+
+?tapply
+
+as_factor_vars <- c("s9_mix", "nr", "name", 
+                  "class", "laboratory", "study")
+
+prevalidation <- prevalidation %>%
+       mutate_each_(funs(factor(.)), as_factor_vars)
+str(prevalidation)
+```
+
+## 3) Complete cases 
+The dataset has a number of missing values and incomplete cases.
+First filter the data for all the cases that are complete
+```{r}
+?complete.cases
+complete_ind <- complete.cases(prevalidation)
+complete_prevalidation <- prevalidation[complete_ind,]
+head(complete_prevalidation)
+```
+
+## 3) Summarize data
+Do you need to calculate means for every chemical?
+In oder to investigate relations it is probably a good idea to calculate the mean of the duplos (you can see two observations for most chemical).
+Calculate a summary where you `group_by(laboratory, name, nr, class, s9_mix)`
+Use this summary for graph 2-4.
+
+```{r}
+summary <- complete_prevalidation %>% 
+  select(laboratory, s9_mix, nr, class, name, p53_cyto_mec, p53_ifmax) %>%
+  group_by(laboratory, name, nr, class, s9_mix) %>%
+  summarise(mean_p53_if = mean(p53_ifmax), 
+            sd_p53_if = sd(p53_ifmax),
+            mean_p53_cyto_mec = mean(p53_cyto_mec),
+            sd_p53_cyto_mec = mean(p53_cyto_mec))
+head(summary)
+```
+
+
+## Example plot 1:
+How does the relationship between the chemicals (`$name`) and the `$p53_cyto_mec` variable look?
+```{r}
+prevalidation$class <- as.factor(prevalidation$class)
+names(prevalidation)
+ggplot(data = prevalidation, aes(x = nr, y = p53_cyto_mec)) +
+  geom_point(aes(color = class)) 
+```
+
+## Example plot 2: 
+ Can you plot the relationships between the `$name`, the `$class` variable and the `$p53.ifmax` variable for each `$laboratory`? Make this plot from summarized data (sumarize the observation for each duplo measurement) 
+```{r}
+names(summary)
+ggplot(data = summary, aes(x = nr, y = mean_p53_if)) +
+  geom_point() +
+## add labels to the chemicals
+    geom_text(aes(label = name), hjust = 0, vjust = 0) +
+## add facets
+facet_wrap(class ~ laboratory, ncol = 2)
+```
+
+## Another example
+```{r}
+names(summary)
+str(summary)
+summary$class <- as.factor(summary$class)
+fac_summary <- c("laboratory", "class", "s9_mix", "name", "nr")
+## convert factors to factors
+summary <- summary %>% mutate_at(fac_summary, funs(factor(.))) 
+## figure call
+  summary %>%
+  ggplot(aes(x = nr, y = mean_p53_if)) +
+    geom_point(aes(color = class)) 
+
+#+
+
+#facet_wrap(laboratory ~, ncol = 2)
+```
+
+## Example graph 3 
+Make a graph with facets that display only the chemical that have an induction of mean p53_if of above 5.0.
+```{r}
+names(summary)
+summary %>% filter(mean_p53_if >= 5.0) %>%
+
+ggplot(aes(x = nr, y = mean_p53_if)) +
+  geom_point() +
+## add labels to the chemicals
+    geom_text(aes(label = name), hjust = 0, vjust = 0) +
+## add facets
+facet_wrap(class ~ laboratory, ncol = 2)
+```
+ 
+ What can you conclude from this plot on the relation between class of the chemical and the induction of p53_if_max?
+
+Example graph 4
+Create a meaningful bar-graph for this data set. You can choose what to plot yourself
+See e.g. page 29 from "r4ds"
+```{r}
+names(summary)
+ggplot(data = summary, aes(x = class, y = mean_p53_if)) +
+  geom_bar(aes(fill = laboratory), stat = "identity",
+           position = "dodge") 
+```
+

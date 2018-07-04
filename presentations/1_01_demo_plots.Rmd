@@ -1,0 +1,1025 @@
+---
+title: "Several R plot examples"
+author: "Marc A.T. Teunis"
+date: "`r Sys.Date()`"
+output:
+  ioslides_presentation: 
+    highlight: pygments
+    widescreen: yes
+---
+<style>
+
+.footer {
+    font-size: 16pt;
+    color: Black;
+    font-family: 'Helvetica'
+    content: attr(label);
+    position: absolute;
+    margin-left: auto;
+    margin-right: auto;
+    left: 0;
+    right: 0;
+    text-align:center;
+    bottom: 10px;
+    line-height: 1.9;
+    display: block;
+}
+
+</style>
+
+<div class="footer" style="margin-top;font-size:120%;"> 
+Data Analysis Using R - January 2018 </div>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      warning = FALSE,
+                      error = FALSE,
+                      message = FALSE)
+
+```
+
+## In the intro lecture we saw the CIRCOS plot.
+The code of this plot is depicted in the `code chunk` below.
+```{r}
+# Press the `knit` button in RStudio and look at the result.
+```
+
+## R packages
+```{r, echo=TRUE}
+## CRAN
+require("stats") || utils::install.packages("stats")
+library(stats)
+require("circlize") || utils::install.packages("circlize")
+library(circlize) 
+library(pheatmap)
+library(ggplot2)
+library(drc)
+library(tidyverse)
+## Bionconductor
+# source("https://bioconductor.org/biocLite.R")
+# biocLite("DESeq2")
+#biocLite("GEOquery")
+#biocLite("tximport")
+#biocLite("tximportData")
+biocLite("pasilla")
+library(DESeq2)
+library(GEOquery)
+library("tximport")
+library("readr")
+library("tximportData")
+library(pasilla)
+```
+
+## Circos plot
+```{r}
+# dend: as dendrogram object, usually returned by hclust and as.dendrogram
+# maxy: maximum height of the tree
+circos.dendrogram = function(dend, maxy) {
+  labels = as.character(labels(dend))
+  x = seq_along(labels) - 0.5
+  names(x) = labels
+  
+  is.leaf = function(object) (is.logical(L <- attr(object, "leaf"))) && L
+  
+  # recursive function to draw the tree
+  draw.d = function(dend, maxy) {
+    leaf = attr(dend, "leaf")
+    d1 = dend[[1]]
+    d2 = dend[[2]]
+    height = attr(dend, 'height')
+    midpoint = attr(dend, 'midpoint')
+    
+    if(is.leaf(d1)) {
+      x1 = x[as.character(attr(d1, "label"))]
+    } else {
+      x1 = attr(d1, "midpoint") + x[as.character(labels(d1))[1]]
+    }
+    y1 = attr(d1, "height")
+    
+    if(is.leaf(d2)) {
+      x2 = x[as.character(attr(d2, "label"))]
+    } else {
+      x2 = attr(d2, "midpoint") + x[as.character(labels(d2))[1]]
+    }
+    y2 = attr(d2, "height")
+    
+    circos.lines(c(x1, x1), maxy - c(y1, height), straight = TRUE)
+    circos.lines(c(x1, x2), maxy - c(height, height))
+    circos.lines(c(x2, x2), maxy - c(y2, height), straight = TRUE)
+    
+    if(!is.leaf(d1)) {
+      draw.d(d1, maxy)
+    }
+    if(!is.leaf(d2)) {
+      draw.d(d2, maxy)
+    }
+  }
+  
+  draw.d(dend, maxy)
+}
+
+
+mat = matrix(rnorm(100*10), nrow = 10, ncol = 100)
+factors = rep(letters[1:2], 50)
+par(mar = c(1, 1, 1, 1))
+circos.par(cell.padding = c(0, 0, 0, 0), gap.degree = 5)
+circos.initialize(factors, xlim = c(0, 50))
+maxy = 0
+
+f = colorRamp2(breaks = c(-1, 0, 1), colors = c("green", "black", "red"))
+
+circos.trackPlotRegion(ylim = c(0, 10), bg.border = NA, panel.fun = function(x, y) {
+  sector.index = get.cell.meta.data("sector.index")
+  m = mat[, factors == sector.index]
+  
+  dend.col = as.dendrogram(hclust(dist(t(m))))
+  
+  maxy = ifelse(maxy > attr(dend.col, "height"), maxy, attr(dend.col, "height"))
+  assign("maxy", maxy, envir = .GlobalEnv)
+  
+  m2 = m[, labels(dend.col)]
+  nr = nrow(m2)
+  nc = ncol(m2)
+  for(i in 1:nr) {
+    for(j in 1:nc) {
+      circos.rect(j-1, nr-i, j, nr-i+1, border = f(m2[i, j]), col = f(m2[i, j]))
+    }
+  }
+  
+})
+circos.trackPlotRegion(ylim = c(0, maxy), bg.border = NA, track.height = 0.3, panel.fun = function(x, y) {
+  sector.index = get.cell.meta.data("sector.index")
+  m = mat[, factors == sector.index]
+  
+  dend.col = as.dendrogram(hclust(dist(t(m))))
+  
+  circos.dendrogram(dend.col, maxy)
+  
+})
+
+circos.clear()
+
+x = seq(-10, 10, length.out=100)/40
+col =f(seq(-2, 2, length.out = length(x-1)))
+for(i in seq_along(x)) {
+  if(i == 1) next
+  rect(x[i-1], -0.05, x[i], 0.05, col = col[i], border = col[i])
+}
+
+text(x[1], -0.08, "-2", adj = c(0.5, 1), cex = 1.2)
+text(x[ceiling(length(x)/2)], -0.08, "0", adj = c(0.5, 1), cex = 1.2)
+text(x[length(x)], -0.08, "2", adj = c(0.5, 1), cex = 1.2)
+```
+
+## Heatmaps
+```{r}
+library(gplots)
+library(geneplotter)
+
+# Mol Biol Cell. 1998 Dec;9(12):3273-97.
+# Comprehensive identification of cell cycle-regulated genes of the yeast
+# Saccharomyces cerevisiae by microarray hybridization.
+# Spellman PT, Sherlock G, Zhang MQ, Iyer VR, Anders K, Eisen MB, Brown PO, Botstein D, Futcher B.
+# Department of Genetics, Stanford University Medical Center, Stanford, California 94306-5120, USA.
+#
+# We sought to create a comprehensive catalog of yeast genes whose transcript levels vary
+# periodically within the cell cycle. To this end, we used DNA microarrays and samples from
+# yeast cultures synchronized by three independent methods: alpha factor arrest, elutriation,
+# and arrest of a cdc15 temperature-sensitive mutant. Using periodicity and correlation algorithms,
+# we identified 800 genes that meet an objective minimum criterion for cell cycle regulation.
+# In separate experiments, designed to examine the effects of inducing either the G1 cyclin
+# Cln3p or the B-type cyclin Clb2p, we found that the mRNA levels of more than half of these
+# 800 genes respond to one or both of these cyclins. Furthermore, we analyzed our set of cell
+# cycle-regulated genes for known and new promoter elements and show that several known elements
+# (or variations thereof) contain information predictive of cell cycle regulation. A full
+# description and complete data sets are available at http://cellcycle-www.stanford.edu
+
+# read the data in from URL
+bots <- read.table(url("http://genome-www.stanford.edu/cellcycle/data/rawdata/combined.txt"), sep="\t", header=TRUE)
+
+# get just the alpha data
+abot <- bots[,c(8:25)]
+rownames(abot) <- bots[,1]
+abot[1:7,] %>% as_tibble()
+
+# get rid of NAs
+abot[is.na(abot)] <- 0
+
+# we need to find a way of reducing the data. Can't do ANOVA as there are no
+# replicates. Sort on max difference and take first 1000
+min <-apply(abot, 1, min)
+max <- apply(abot, 1, max)
+sabot <- abot[order(max - min, decreasing=TRUE),][1:1000,]
+
+# cluster on correlation
+cdist <- as.dist(1 - cor(t(sabot)))
+hc <- hclust(cdist, "average")
+```
+
+## Draw a heatmap
+```{r}
+# x11()
+heatmap.2(as.matrix(sabot),
+          Rowv=as.dendrogram(hc),
+          Colv=FALSE,
+          cexRow=0.05,
+          cexCol=1,
+          dendrogram="row",
+          scale="row",
+          trace="none",
+          density.info="none",
+          key=FALSE,
+          col=greenred.colors(80))
+```
+
+## Different colours
+```{r}
+# x11()
+heatmap.2(as.matrix(sabot),
+          Rowv=as.dendrogram(hc),
+          Colv=FALSE,
+          cexRow=0.05,
+          cexCol=1,
+          dendrogram="row",
+          scale="row",
+          trace="none",
+          density.info="none",
+          key=FALSE,
+          col=heat.colors(80))
+```
+
+## More control over colours
+```{r}
+# x11()
+
+my_palette <- colorRampPalette(c("blue", "yellow", "darkgreen"))(n = 80)
+
+heatmap.2(as.matrix(sabot),
+          Rowv=as.dendrogram(hc),
+          Colv=FALSE,
+          cexRow=0.05,
+          cexCol=1,
+          dendrogram="row",
+          scale="row",
+          trace="none",
+          density.info="none",
+          key=FALSE,
+          col=my_palette)
+```
+
+## Dose response relations
+```{r, echo=TRUE}
+library(drc)
+ryegrass %>% as_tibble()
+## Fitting models to be plotted below
+ryegrass.m1 <- drm(rootl~conc, data = ryegrass, fct = LL.4())
+ryegrass.m2 <- drm(rootl~conc, data = ryegrass, fct = LL.3())  
+# lower limit fixed at 0
+```
+
+## Plotting observations and fitted curve for the first model
+```{r}
+library(drc)
+plot(ryegrass.m1, broken = TRUE)
+```
+
+## Adding fitted curve for the second model (not much difference)
+```{r}
+plot(ryegrass.m1, broken = TRUE)
+plot(ryegrass.m2, broken = TRUE, add = TRUE, type = "none", col = 2, lty = 2)
+```
+
+## Add confidence region for the first model.
+```{r}
+plot(ryegrass.m1, broken = TRUE)
+plot(ryegrass.m2, broken = TRUE, add = TRUE, type = "none", col = 2, lty = 2)
+plot(ryegrass.m1, broken = TRUE, type="confidence", add=TRUE) 
+```
+
+## Finetuning the axis break
+```{r}
+plot(ryegrass.m1, broken = TRUE, bcontrol = list(style = "gap"))
+```
+
+## Network plots
+```{r}
+library(ReactomePA)
+## try http:// if https:// URLs are not supported
+source("https://bioconductor.org/biocLite.R")
+#biocLite("ReactomePA")
+#biocLite("DOSE")
+#biocLite("org.Hs.eg.db")
+#browseVignettes("ReactomePA")
+
+library(org.Hs.eg.db)
+library(DOSE)
+library(ReactomePA)
+
+## ------------------------------------------------------------------------
+library(ReactomePA)
+data(geneList)
+de <- names(geneList)[abs(geneList) > 1.5]
+head(de)
+x <- enrichPathway(gene=de,pvalueCutoff=0.05, readable=T)
+head(as.data.frame(x))
+```
+
+## Barplot
+```{r, fig.height=6, fig.width=12}
+## ----fig.height=6, fig.width=12------------------------------------------
+
+barplot(x, showCategory=8)
+```
+
+## Dotplot
+```{r}
+## ----fig.height=6, fig.width=12------------------------------------------
+dotplot(x, showCategory=15)
+```
+
+## Network with clusters
+```{r}
+## ----fig.height=10, fig.width=10-----------------------------------------
+emapplot(x)
+```
+
+## Cnet network
+```{r}
+## ----fig.height=8, fig.width=8-------------------------------------------
+cnetplot(x, categorySize="pvalue", foldChange=geneList)
+```
+
+## ggplot2
+```{r}
+library(ggplot2)
+library(dplyr)
+library(gapminder)
+library(wesanderson)
+
+gap_07 <- filter(gapminder, year == 2007)
+
+ggplot(gap_07, aes(x = gdpPercap, y = lifeExp,
+                   color = continent)) +
+
+  geom_point(size = 2) +
+  scale_x_log10() +
+  theme_light() +
+  theme(legend.position = c(0.1, 0.85),
+legend.key = element_blank(),
+axis.text = element_text(size = 12),
+axis.title = element_text(size = 14)) +
+  labs(x = "Per capita GDP",
+       y = "Life Expectancy",
+       title = "2007 Life Expectancy and GDP",
+        color = "Continent") +
+  ggsave("life_exp_gdp_2007_cutom.png", 
+width = 7, height = 7)
+```
+
+## Wells plates
+```{r}
+# install.packages("platetools")
+library(platetools)
+library(viridis)
+
+# example dataframe
+df <- data.frame(vals = rnorm(384),
+                 well = num_to_well(1:384, plate = 384))
+
+raw_map(data = df$vals,
+        well = df$well,
+        plate = 384) +
+    ggtitle("Example 384-well plate") +
+    theme_dark() +
+    scale_fill_viridis()
+```
+
+## RNA sequencing
+```{r}
+library(DESeq2)
+#browseVignettes('DESeq2')
+## ----setup, echo=FALSE, results="hide"-----------------------------------
+
+## ----quickStart, eval=FALSE----------------------------------------------
+#  dds <- DESeqDataSetFromMatrix(countData = cts,
+ #                               colData = coldata,
+  #                              design= ~ batch + condition)
+#  dds <- DESeq(dds)
+#  resultsNames(dds) # lists the coefficients
+#  res <- results(dds, name="condition_trt_vs_untrt")
+#  # or to shrink log fold changes association with condition:
+#  res <- lfcShrink(dds, coef="condition_trt_vs_untrt", type="apeglm")
+
+## ----txiSetup------------------------------------------------------------
+
+dir <- system.file("extdata", package="tximportData")
+samples <- read.table(file.path(dir,"samples.txt"), header=TRUE)
+samples$condition <- factor(rep(c("A","B"),each=3))
+rownames(samples) <- samples$run
+samples[,c("pop","center","run","condition")]
+
+## ----txiFiles------------------------------------------------------------
+files <- file.path(dir,"salmon", samples$run, "quant.sf.gz")
+names(files) <- samples$run
+tx2gene <- read_csv(file.path(dir, "tx2gene.gencode.v27.csv"))
+
+## ----tximport, results="hide"--------------------------------------------
+txi <- tximport(files, type="salmon", tx2gene=tx2gene)
+
+## ----txi2dds, results="hide"---------------------------------------------
+library("DESeq2")
+ddsTxi <- DESeqDataSetFromTximport(txi,
+                                   colData = samples,
+                                   design = ~ condition)
+
+## ----loadPasilla---------------------------------------------------------
+library("pasilla")
+pasCts <- system.file("extdata",
+                      "pasilla_gene_counts.tsv",
+                      package="pasilla", mustWork=TRUE)
+pasAnno <- system.file("extdata",
+                       "pasilla_sample_annotation.csv",
+                       package="pasilla", mustWork=TRUE)
+cts <- as.matrix(read.csv(pasCts,sep="\t",row.names="gene_id"))
+coldata <- read.csv(pasAnno, row.names=1)
+coldata <- coldata[,c("condition","type")]
+
+## ----showPasilla---------------------------------------------------------
+head(cts,2)
+coldata
+
+## ----reorderPasila-------------------------------------------------------
+rownames(coldata) <- sub("fb", "", rownames(coldata))
+all(rownames(coldata) %in% colnames(cts))
+all(rownames(coldata) == colnames(cts))
+cts <- cts[, rownames(coldata)]
+all(rownames(coldata) == colnames(cts))
+
+## ----matrixInput---------------------------------------------------------
+library("DESeq2")
+dds <- DESeqDataSetFromMatrix(countData = cts,
+                              colData = coldata,
+                              design = ~ condition)
+dds
+
+## ----addFeatureData------------------------------------------------------
+featureData <- data.frame(gene=rownames(cts))
+mcols(dds) <- DataFrame(mcols(dds), featureData)
+mcols(dds)
+
+## ----htseqDirI, eval=FALSE-----------------------------------------------
+#  directory <- "/path/to/your/files/"
+
+## ----htseqDirII----------------------------------------------------------
+directory <- system.file("extdata", package="pasilla",
+                         mustWork=TRUE)
+
+## ----htseqInput----------------------------------------------------------
+sampleFiles <- grep("treated",list.files(directory),value=TRUE)
+sampleCondition <- sub("(.*treated).*","\\1",sampleFiles)
+sampleTable <- data.frame(sampleName = sampleFiles,
+                          fileName = sampleFiles,
+                          condition = sampleCondition)
+
+## ----hsteqDds------------------------------------------------------------
+library("DESeq2")
+ddsHTSeq <- DESeqDataSetFromHTSeqCount(sampleTable = sampleTable,
+                                       directory = directory,
+                                       design= ~ condition)
+ddsHTSeq
+
+## ----loadSumExp----------------------------------------------------------
+# biocLite("airway")
+library("airway")
+data("airway")
+se <- airway
+
+## ----sumExpInput---------------------------------------------------------
+library("DESeq2")
+ddsSE <- DESeqDataSet(se, design = ~ cell + dex)
+ddsSE
+
+## ----prefilter-----------------------------------------------------------
+keep <- rowSums(counts(dds)) >= 10
+dds <- dds[keep,]
+
+## ----factorlvl-----------------------------------------------------------
+dds$condition <- factor(dds$condition, levels = c("untreated","treated"))
+
+## ----relevel-------------------------------------------------------------
+dds$condition <- relevel(dds$condition, ref = "untreated")
+
+## ----droplevels----------------------------------------------------------
+dds$condition <- droplevels(dds$condition)
+
+## ----deseq---------------------------------------------------------------
+dds <- DESeq(dds)
+res <- results(dds)
+res
+
+## ----eval=FALSE----------------------------------------------------------
+#  res <- results(dds, name="condition_treated_vs_untreated")
+#  res <- results(dds, contrast=c("condition","treated","untreated"))
+
+## ----lfcShrink-----------------------------------------------------------
+#biocLite("apeglm")
+resultsNames(dds)
+resLFC <- lfcShrink(dds, coef="condition_treated_vs_untreated", type="apeglm")
+resLFC
+
+## ----parallel, eval=FALSE------------------------------------------------
+#  library("BiocParallel")
+#  register(MulticoreParam(4))
+
+## ----resOrder------------------------------------------------------------
+resOrdered <- res[order(res$pvalue),]
+
+## ----sumRes--------------------------------------------------------------
+summary(res)
+
+## ----sumRes01------------------------------------------------------------
+sum(res$padj < 0.1, na.rm=TRUE)
+
+## ----resAlpha05----------------------------------------------------------
+res05 <- results(dds, alpha=0.05)
+summary(res05)
+sum(res05$padj < 0.05, na.rm=TRUE)
+
+## ----IHW-----------------------------------------------------------------
+#biocLite("IHW")
+library("IHW")
+resIHW <- results(dds, filterFun=ihw)
+summary(resIHW)
+sum(resIHW$padj < 0.1, na.rm=TRUE)
+metadata(resIHW)$ihwResult
+
+## ----MA------------------------------------------------------------------
+plotMA(res, ylim=c(-2,2))
+
+## ----shrunkMA------------------------------------------------------------
+plotMA(resLFC, ylim=c(-2,2))
+
+## ----MAidentify, eval=FALSE----------------------------------------------
+#  idx <- identify(res$baseMean, res$log2FoldChange)
+#  rownames(res)[idx]
+
+## ----warning=FALSE-------------------------------------------------------
+resultsNames(dds)
+# because we are interested in treated vs untreated, we set 'coef=2'
+resNorm <- lfcShrink(dds, coef=2, type="normal")
+resAsh <- lfcShrink(dds, coef=2, type="ashr")
+
+biocLite("ashr")
+## ----fig.width=8, fig.height=3-------------------------------------------
+par(mfrow=c(1,3), mar=c(4,4,2,1))
+xlim <- c(1,1e5); ylim <- c(-3,3)
+plotMA(resLFC, xlim=xlim, ylim=ylim, main="apeglm")
+plotMA(resNorm, xlim=xlim, ylim=ylim, main="normal")
+plotMA(resAsh, xlim=xlim, ylim=ylim, main="ashr")
+
+## ----plotCounts----------------------------------------------------------
+plotCounts(dds, gene=which.min(res$padj), intgroup="condition")
+
+## ----plotCountsAdv-------------------------------------------------------
+d <- plotCounts(dds, gene=which.min(res$padj), intgroup="condition", 
+                returnData=TRUE)
+library("ggplot2")
+ggplot(d, aes(x=condition, y=count)) + 
+  geom_point(position=position_jitter(w=0.1,h=0)) + 
+  scale_y_log10(breaks=c(25,100,400))
+
+## ----metadata------------------------------------------------------------
+mcols(res)$description
+
+## ----export, eval=FALSE--------------------------------------------------
+#  write.csv(as.data.frame(resOrdered),
+#            file="condition_treated_results.csv")
+
+## ----subset--------------------------------------------------------------
+resSig <- subset(resOrdered, padj < 0.1)
+resSig
+
+## ----multifactor---------------------------------------------------------
+colData(dds)
+
+## ----copyMultifactor-----------------------------------------------------
+ddsMF <- dds
+
+## ----fixLevels-----------------------------------------------------------
+levels(ddsMF$type)
+levels(ddsMF$type) <- sub("-.*", "", levels(ddsMF$type))
+levels(ddsMF$type)
+
+## ----replaceDesign-------------------------------------------------------
+design(ddsMF) <- formula(~ type + condition)
+ddsMF <- DESeq(ddsMF)
+
+## ----multiResults--------------------------------------------------------
+resMF <- results(ddsMF)
+head(resMF)
+
+## ----multiTypeResults----------------------------------------------------
+resMFType <- results(ddsMF,
+                     contrast=c("type", "single", "paired"))
+head(resMFType)
+
+## ----rlogAndVST----------------------------------------------------------
+vsd <- vst(dds, blind=FALSE)
+rld <- rlog(dds, blind=FALSE)
+head(assay(vsd), 3)
+
+## ----meansd--------------------------------------------------------------
+# this gives log2(n + 1)
+ntd <- normTransform(dds)
+library("vsn")
+meanSdPlot(assay(ntd))
+meanSdPlot(assay(vsd))
+meanSdPlot(assay(rld))
+
+## ----heatmap-------------------------------------------------------------
+library("pheatmap")
+select <- order(rowMeans(counts(dds,normalized=TRUE)),
+                decreasing=TRUE)[1:20]
+df <- as.data.frame(colData(dds)[,c("condition","type")])
+pheatmap(assay(ntd)[select,], cluster_rows=FALSE, show_rownames=FALSE,
+         cluster_cols=FALSE, annotation_col=df)
+pheatmap(assay(vsd)[select,], cluster_rows=FALSE, show_rownames=FALSE,
+         cluster_cols=FALSE, annotation_col=df)
+pheatmap(assay(rld)[select,], cluster_rows=FALSE, show_rownames=FALSE,
+         cluster_cols=FALSE, annotation_col=df)
+
+## ----sampleClust---------------------------------------------------------
+sampleDists <- dist(t(assay(vsd)))
+
+## ----figHeatmapSamples, fig.height=4, fig.width=6------------------------
+library("RColorBrewer")
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) <- paste(vsd$condition, vsd$type, sep="-")
+colnames(sampleDistMatrix) <- NULL
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors)
+
+## ----figPCA--------------------------------------------------------------
+plotPCA(vsd, intgroup=c("condition", "type"))
+
+## ----figPCA2-------------------------------------------------------------
+pcaData <- plotPCA(vsd, intgroup=c("condition", "type"), returnData=TRUE)
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+ggplot(pcaData, aes(PC1, PC2, color=condition, shape=type)) +
+  geom_point(size=3) +
+  xlab(paste0("PC1: ",percentVar[1],"% variance")) +
+  ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
+  coord_fixed()
+
+## ----WaldTest, eval=FALSE------------------------------------------------
+#  dds <- estimateSizeFactors(dds)
+#  dds <- estimateDispersions(dds)
+#  dds <- nbinomWaldTest(dds)
+
+## ----simpleContrast, eval=FALSE------------------------------------------
+#  results(dds, contrast=c("condition","C","B"))
+
+## ----combineFactors, eval=FALSE------------------------------------------
+#  dds$group <- factor(paste0(dds$genotype, dds$condition))
+#  design(dds) <- ~ group
+#  dds <- DESeq(dds)
+#  resultsNames(dds)
+#  results(dds, contrast=c("group", "IB", "IA"))
+
+## ----interFig, echo=FALSE, results="hide", fig.height=3------------------
+npg <- 20
+mu <- 2^c(8,10,9,11,10,12)
+cond <- rep(rep(c("A","B"),each=npg),3)
+geno <- rep(c("I","II","III"),each=2*npg)
+table(cond, geno)
+counts <- rnbinom(6*npg, mu=rep(mu,each=npg), size=1/.01)
+d <- data.frame(log2c=log2(counts+1), cond, geno)
+library("ggplot2")
+plotit <- function(d, title) {
+  ggplot(d, aes(x=cond, y=log2c, group=geno)) + 
+    geom_jitter(size=1.5, position = position_jitter(width=.15)) +
+    facet_wrap(~ geno) + 
+    stat_summary(fun.y=mean, geom="line", colour="red", size=0.8) + 
+    xlab("condition") + ylab("log2(counts+1)") + ggtitle(title)
+}
+plotit(d, "Gene 1") + ylim(7,13)
+lm(log2c ~ cond + geno + geno:cond, data=d)
+
+## ----interFig2, echo=FALSE, results="hide", fig.height=3-----------------
+mu[4] <- 2^12
+mu[6] <- 2^8
+counts <- rnbinom(6*npg, mu=rep(mu,each=npg), size=1/.01)
+d2 <- data.frame(log2c=log2(counts + 1), cond, geno)
+plotit(d2, "Gene 2") + ylim(7,13)
+lm(log2c ~ cond + geno + geno:cond, data=d2)
+
+## ----simpleLRT, eval=FALSE-----------------------------------------------
+#  dds <- DESeq(dds, test="LRT", reduced=~1)
+#  res <- results(dds)
+
+## ----simpleLRT2, eval=FALSE----------------------------------------------
+#  dds <- DESeq(dds, test="LRT", reduced=~batch)
+#  res <- results(dds)
+
+## ----apeThresh-----------------------------------------------------------
+resApeT <- lfcShrink(dds, coef=2, type="apeglm", lfcThreshold=1)
+plotMA(resApeT, ylim=c(-3,3), cex=.8)
+abline(h=c(-1,1), col="dodgerblue", lwd=2)
+
+## ------------------------------------------------------------------------
+condition <- factor(rep(c("A","B","C"),each=2))
+model.matrix(~ condition)
+# to compare C vs B, make B the reference level,
+# and select the last coefficient
+condition <- relevel(condition, "B")
+model.matrix(~ condition)
+
+## ------------------------------------------------------------------------
+grp <- factor(rep(1:3,each=4))
+cnd <- factor(rep(rep(c("A","B"),each=2),3))
+model.matrix(~ grp + cnd + grp:cnd)
+# to compare condition effect in group 3 vs 2,
+# make group 2 the reference level,
+# and select the last coefficient
+grp <- relevel(grp, "2")
+model.matrix(~ grp + cnd + grp:cnd)
+
+## ------------------------------------------------------------------------
+grp <- factor(rep(1:2,each=4))
+ind <- factor(rep(rep(1:2,each=2),2))
+cnd <- factor(rep(c("A","B"),4))
+model.matrix(~grp + grp:ind + grp:cnd)
+# to compare condition effect across group,
+# add a main effect for 'cnd',
+# and select the last coefficient
+model.matrix(~grp + cnd + grp:ind + grp:cnd)
+
+## ----boxplotCooks--------------------------------------------------------
+par(mar=c(8,5,2,2))
+boxplot(log10(assays(dds)[["cooks"]]), range=0, las=2)
+
+## ----dispFit-------------------------------------------------------------
+plotDispEsts(dds)
+
+## ----dispFitCustom-------------------------------------------------------
+ddsCustom <- dds
+useForMedian <- mcols(ddsCustom)$dispGeneEst > 1e-7
+medianDisp <- median(mcols(ddsCustom)$dispGeneEst[useForMedian],
+                     na.rm=TRUE)
+dispersionFunction(ddsCustom) <- function(mu) medianDisp
+ddsCustom <- estimateDispersionsMAP(ddsCustom)
+
+## ----filtByMean----------------------------------------------------------
+metadata(res)$alpha
+metadata(res)$filterThreshold
+plot(metadata(res)$filterNumRej, 
+     type="b", ylab="number of rejections",
+     xlab="quantiles of filter")
+lines(metadata(res)$lo.fit, col="red")
+abline(v=metadata(res)$filterTheta)
+
+## ----noFilt--------------------------------------------------------------
+resNoFilt <- results(dds, independentFiltering=FALSE)
+addmargins(table(filtering=(res$padj < .1),
+                 noFiltering=(resNoFilt$padj < .1)))
+
+## ----lfcThresh-----------------------------------------------------------
+par(mfrow=c(2,2),mar=c(2,2,1,1))
+ylim <- c(-2.5,2.5)
+resGA <- results(dds, lfcThreshold=.5, altHypothesis="greaterAbs")
+resLA <- results(dds, lfcThreshold=.5, altHypothesis="lessAbs")
+resG <- results(dds, lfcThreshold=.5, altHypothesis="greater")
+resL <- results(dds, lfcThreshold=.5, altHypothesis="less")
+drawLines <- function() abline(h=c(-.5,.5),col="dodgerblue",lwd=2)
+plotMA(resGA, ylim=ylim); drawLines()
+plotMA(resLA, ylim=ylim); drawLines()
+plotMA(resG, ylim=ylim); drawLines()
+plotMA(resL, ylim=ylim); drawLines()
+
+## ----mcols---------------------------------------------------------------
+mcols(dds,use.names=TRUE)[1:4,1:4]
+substr(names(mcols(dds)),1,10) 
+mcols(mcols(dds), use.names=TRUE)[1:4,]
+
+## ----muAndCooks----------------------------------------------------------
+head(assays(dds)[["mu"]])
+head(assays(dds)[["cooks"]])
+
+## ----dispersions---------------------------------------------------------
+head(dispersions(dds))
+head(mcols(dds)$dispersion)
+
+## ----sizefactors---------------------------------------------------------
+sizeFactors(dds)
+
+## ----coef----------------------------------------------------------------
+head(coef(dds))
+
+## ----betaPriorVar--------------------------------------------------------
+attr(dds, "betaPriorVar")
+
+## ----priorInfo-----------------------------------------------------------
+priorInfo(resLFC)
+priorInfo(resNorm)
+priorInfo(resAsh)
+
+## ----dispPriorVar--------------------------------------------------------
+dispersionFunction(dds)
+attr(dispersionFunction(dds), "dispPriorVar")
+
+## ----versionNum----------------------------------------------------------
+metadata(dds)[["version"]]
+
+## ----normFactors, eval=FALSE---------------------------------------------
+#  normFactors <- normFactors / exp(rowMeans(log(normFactors)))
+#  normalizationFactors(dds) <- normFactors
+
+## ----offsetTransform, eval=FALSE-----------------------------------------
+#  cqnOffset <- cqnObject$glm.offset
+#  cqnNormFactors <- exp(cqnOffset)
+#  EDASeqNormFactors <- exp(-1 * EDASeqOffset)
+
+## ----lineardep, echo=FALSE-----------------------------------------------
+DataFrame(batch=factor(c(1,1,2,2)), condition=factor(c("A","A","B","B")))
+
+## ----lineardep2, echo=FALSE----------------------------------------------
+DataFrame(batch=factor(c(1,1,1,1,2,2)), condition=factor(c("A","A","B","B","C","C")))
+
+## ----lineardep3, echo=FALSE----------------------------------------------
+DataFrame(batch=factor(c(1,1,1,2,2,2)), condition=factor(c("A","B","C","A","B","C")))
+
+## ----groupeffect---------------------------------------------------------
+coldata <- DataFrame(grp=factor(rep(c("X","Y"),each=6)),
+                       ind=factor(rep(1:6,each=2)),
+                      cnd=factor(rep(c("A","B"),6)))
+coldata
+
+## ------------------------------------------------------------------------
+as.data.frame(coldata)
+
+## ----groupeffect2--------------------------------------------------------
+coldata$ind.n <- factor(rep(rep(1:3,each=2),2))
+as.data.frame(coldata)
+
+## ----groupeffect3--------------------------------------------------------
+model.matrix(~ grp + grp:ind.n + grp:cnd, coldata)
+
+## ----groupeffect4, eval=FALSE--------------------------------------------
+#  results(dds, contrast=list("grpY.cndB","grpX.cndB"))
+
+## ----missingcombo--------------------------------------------------------
+group <- factor(rep(1:3,each=6))
+condition <- factor(rep(rep(c("A","B","C"),each=2),3))
+d <- DataFrame(group, condition)[-c(17,18),]
+as.data.frame(d)
+
+## ----missingcombo2-------------------------------------------------------
+m1 <- model.matrix(~ condition*group, d)
+colnames(m1)
+unname(m1)
+all.zero <- apply(m1, 2, function(x) all(x==0))
+all.zero
+
+## ----missingcombo3-------------------------------------------------------
+idx <- which(all.zero)
+m1 <- m1[,-idx]
+unname(m1)
+
+## ----cooksPlot-----------------------------------------------------------
+W <- res$stat
+maxCooks <- apply(assays(dds)[["cooks"]],1,max)
+idx <- !is.na(W)
+plot(rank(W[idx]), maxCooks[idx], xlab="rank of Wald statistic", 
+     ylab="maximum Cook's distance per gene",
+     ylim=c(0,5), cex=.4, col=rgb(0,0,0,.3))
+m <- ncol(dds)
+p <- 3
+abline(h=qf(.99, p, m - p))
+
+## ----indFilt-------------------------------------------------------------
+plot(res$baseMean+1, -log10(res$pvalue),
+     log="x", xlab="mean of normalized counts",
+     ylab=expression(-log[10](pvalue)),
+     ylim=c(0,30),
+     cex=.4, col=rgb(0,0,0,.3))
+
+## ----histindepfilt-------------------------------------------------------
+use <- res$baseMean > metadata(res)$filterThreshold
+h1 <- hist(res$pvalue[!use], breaks=0:50/50, plot=FALSE)
+h2 <- hist(res$pvalue[use], breaks=0:50/50, plot=FALSE)
+colori <- c(`do not pass`="khaki", `pass`="powderblue")
+
+## ----fighistindepfilt----------------------------------------------------
+barplot(height = rbind(h1$counts, h2$counts), beside = FALSE,
+        col = colori, space = 0, main = "", ylab="frequency")
+text(x = c(0, length(h1$counts)), y = 0, label = paste(c(0,1)),
+     adj = c(0.5,1.7), xpd=NA)
+legend("topright", fill=rev(colori), legend=rev(names(colori)))
+
+## ----vanillaDESeq, eval=FALSE--------------------------------------------
+#  dds <- DESeq(dds, minReplicatesForReplace=Inf)
+#  res <- results(dds, cooksCutoff=FALSE, independentFiltering=FALSE)
+
+## ----varGroup, echo=FALSE------------------------------------------------
+set.seed(3)
+dds1 <- makeExampleDESeqDataSet(n=1000,m=12,betaSD=.3,dispMeanRel=function(x) 0.01)
+dds2 <- makeExampleDESeqDataSet(n=1000,m=12,
+                                betaSD=.3,
+                                interceptMean=mcols(dds1)$trueIntercept,
+                                interceptSD=0,
+                                dispMeanRel=function(x) 0.2)
+dds2 <- dds2[,7:12]
+dds2$condition <- rep("C",6)
+mcols(dds2) <- NULL
+dds12 <- cbind(dds1, dds2)
+rld <- rlog(dds12, blind=FALSE, fitType="mean")
+plotPCA(rld)
+
+## ----convertNA, eval=FALSE-----------------------------------------------
+#  res$padj <- ifelse(is.na(res$padj), 1, res$padj)
+
+## ----sessionInfo---------------------------------------------------------
+sessionInfo()
+
+
+```
+
+
+```{r, include=FALSE}
+library(seqinr)
+## Workflow to create senquence logo's in R
+# https://davetang.org/muse/2013/01/30/sequence-logos-with-r/ 
+library(Biostrings)  
+library(seqLogo)
+
+# Create position weight matrix
+
+## Example sequences
+sequences <- c("GCCAAAAAAA",
+               "CGCAAAAAAA",
+               "TCATAAAAAC",
+               "GCATTAAAAA",
+               "TCGTAAAAAC")
+               
+#?consensusMatrix
+
+sequences <- DNAStringSet(sequences)
+cmx <- consensusMatrix(sequences)
+cmx
+
+hasOnlyBaseLetters(sequences)
+
+clean_cmx <- alphabetFrequency(sequences, baseOnly=TRUE)
+               
+#install if necessary
+#source("http://bioconductor.org/biocLite.R")
+#biocLite("seqLogo")
+
+
+
+#create data frame using the four vectors
+
+#define function that divides the frequency by the row sum i.e. proportions
+proportion <- function(x){
+  rs <- sum(x);
+  return(x / rs);
+}
+
+
+
+#create position weight matrix
+clean_cmx <- t(clean_cmx)
+clean_cmx <- as.data.frame(clean_cmx[c(1:4),])
+clean_cmx
+
+pwm <- apply(clean_cmx, 2, proportion)
+pwm
+pwm <- makePWM(pwm)
+```
+
+## Sequence logog plot
+```{r}
+#png("hunchback.png")
+seqLogo(pwm)
+# dev.off()
+
+```
+
+
+
+## Interactive plot
+```{r}
+
+library()
+
+
+
+
+
+
+```
+
+

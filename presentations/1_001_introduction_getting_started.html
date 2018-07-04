@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Getting started; Data analysis using R</title>
+
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="chrome=1">
+  <meta name="generator" content="pandoc" />
+
+
+
+  <meta name="date" content="2017-11-14" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+
+  <base target="_blank">
+
+  <script type="text/javascript">
+    var SLIDE_CONFIG = {
+      // Slide settings
+      settings: {
+                title: 'Getting started; Data analysis using R',
+                        useBuilds: true,
+        usePrettify: true,
+        enableSlideAreas: true,
+        enableTouch: true,
+                        favIcon: '1_0101_introduction_getting_started_files/logo.png',
+              },
+
+      // Author information
+      presenters: [
+            {
+        name:  'Marc A.T. Teunis' ,
+        company: '',
+        gplus: '',
+        twitter: '',
+        www: '',
+        github: ''
+      },
+            ]
+    };
+  </script>
+
+
+  <style type="text/css">
+
+    b, strong {
+      font-weight: bold;
+    }
+
+    em {
+      font-style: italic;
+    }
+
+    slides > slide {
+      -webkit-transition: all 0.4s ease-in-out;
+      -moz-transition: all 0.4s ease-in-out;
+      -o-transition: all 0.4s ease-in-out;
+      transition: all 0.4s ease-in-out;
+    }
+
+    .auto-fadein {
+      -webkit-transition: opacity 0.6s ease-in;
+      -webkit-transition-delay: 0.4s;
+      -moz-transition: opacity 0.6s ease-in 0.4s;
+      -o-transition: opacity 0.6s ease-in 0.4s;
+      transition: opacity 0.6s ease-in 0.4s;
+      opacity: 0;
+    }
+
+    slides > slide:not(.nobackground):before {
+      font-size: 12pt;
+      content: "";
+      position: absolute;
+      bottom: 20px;
+      left: 60px;
+      background: url(1_0101_introduction_getting_started_files/logo.png) no-repeat 0 50%;
+      -webkit-background-size: 30px 30px;
+      -moz-background-size: 30px 30px;
+      -o-background-size: 30px 30px;
+      background-size: 30px 30px;
+      padding-left: 40px;
+      height: 30px;
+      line-height: 1.9;
+    }
+  </style>
+
+
+</head>
+
+<body style="opacity: 0">
+
+<slides class="layout-widescreen">
+
+  <slide class="title-slide segue nobackground">
+        <aside class="gdbar"><img src="1_0101_introduction_getting_started_files/logo.png"></aside>
+        <!-- The content of this hgroup is replaced programmatically through the slide_config.json. -->
+    <hgroup class="auto-fadein">
+      <h1 data-config-title><!-- populated from slide_config.json --></h1>
+      <h2 data-config-subtitle><!-- populated from slide_config.json --></h2>
+      <p data-config-presenter><!-- populated from slide_config.json --></p>
+            <p style="margin-top: 6px; margin-left: -2px;">2017-11-14</p>
+          </hgroup>
+  </slide>
+
+<style>
+
+.footer {
+    font-size: 16pt;
+    color: Black;
+    font-family: 'Helvetica'
+    content: attr(label);
+    position: absolute;
+    margin-left: auto;
+    margin-right: auto;
+    left: 0;
+    right: 0;
+    text-align:center;
+    bottom: 10px;
+    line-height: 1.9;
+    display: block;
+}
+
+</style>
+
+<div class="footer" style="margin-top;font-size:120%;">
+Data Analysis Using R - November 2017</div>
+
+<slide class=''><hgroup><h2>R is Case sensitive</h2></hgroup><article  id="r-is-case-sensitive">
+
+<p>Important note: R is case-sensitive, meaning that it will matter whether you use capital or lower case, keep this in mind if you get a cryptic warning or error!</p>
+
+</article></slide><slide class=''><hgroup><h2>Cloud server for RStudio</h2></hgroup><article  id="cloud-server-for-rstudio">
+
+<ul>
+<li>Preinstalled version of the R-IDE (integrated development environment) RStudio</li>
+<li>Runs on a remote server and has all the add-ons that are needed to run the code.</li>
+<li>Login with the credentials supplied at the beginning of the course.</li>
+</ul>
+
+<p>To login to this server:</p>
+
+<p><a href='https://data.innovativetesting.nl' title=''>https://data.innovativetesting.nl</a></p>
+
+</article></slide><slide class=''><hgroup><h2>RStudio interface</h2></hgroup><article  id="rstudio-interface">
+
+<p><img src="D:/r_projects/minor_abpc_rcourse/images/1a_rstudio_interface.png" width="1000px" style="display: block; margin: auto auto auto 0;" /></p>
+
+</article></slide><slide class=''><hgroup><h2>Setting up package repositories</h2></hgroup><article  id="setting-up-package-repositories">
+
+<ul>
+<li>Default RStudio has only enabled the CRAN repository, but there are other useful repositories that contain nice R packages.</li>
+<li>Enable the Bioconductor repositories (located at <a href='http://www.bioconductor.org' title=''>http://www.bioconductor.org</a>) as packages from these repositories are often used in molecular biology.</li>
+<li>We only need to do this once, so the next time you start Rstudio it remembers which repositories are enabled.</li>
+<li>Type in the Console window (not the R script window!) the following command:</li>
+</ul>
+
+<pre class = 'prettyprint lang-r'>setRepositories(graphics=TRUE)</pre>
+
+</article></slide><slide class=''><hgroup><h2>Initiate an RStudio project</h2></hgroup><article  id="initiate-an-rstudio-project">
+
+<p>From the File menu choose <em>New Project</em>, than choose <em>New Directory</em>. Provide the project with the name: &quot;r_course &quot;</p>
+
+</article></slide><slide class=''><hgroup><h2>Cloning the course materials from Github.com</h2></hgroup><article  id="cloning-the-course-materials-from-github.com">
+
+<ol>
+<li>Create an account on www.github.com</li>
+<li>Login in to github.com and go to www.github.com/uashogeschoolutrecht/minor_abpc_rcourse</li>
+<li>Copy the <em>clone</em> link</li>
+<li>Start a new project in RStudio-server, choose <em>&quot;Version Control&quot;</em></li>
+<li>Copy the &#39;clone&#39; link in the &#39;url&#39; field, press enter</li>
+<li>Let the clone finish</li>
+</ol>
+
+<p><strong>Follow the steps above first before continuing</strong></p>
+
+<p>Did it work? Please let me know if not.</p>
+
+</article></slide><slide class=''><hgroup><h2>About this document: Literate programming</h2></hgroup><article  id="about-this-document-literate-programming">
+
+<ul>
+<li>This document is an R-markdown document.</li>
+<li>To create documents containing normal text, code and output of that code together.</li>
+<li>So-called <em>&quot;Literate Programming&quot;</em></li>
+<li>Part of the &quot;Reproducible research&quot; philosophy.</li>
+<li>R Markdown can also include and interpret LaTeX, which is used much in the technical fields.</li>
+<li>It can render formulas&#39;s as well</li>
+</ul>
+
+</article></slide><slide class=''><hgroup><h2>Example formula in LaTeX</h2></hgroup><article  id="example-formula-in-latex">
+
+<p>Working_with_R = \(\sqrt[root](absolute(\frac{Participants\;fun}{much\;persistence}))\)</p>
+
+</article></slide><slide class=''><hgroup><h2>Where do my files live?</h2></hgroup><article  id="where-do-my-files-live">
+
+<ul>
+<li>The root of a project can be defined by:</li>
+</ul>
+
+<pre class = 'prettyprint lang-r'>if (!require(&quot;rprojroot&quot;)) install.packages(&quot;rprojroot&quot;)
+library(rprojroot)
+root &lt;- find_root_file(criterion = is_rstudio_project)
+root</pre>
+
+<pre >## [1] &quot;D:/r_projects/minor_abpc_rcourse&quot;</pre>
+
+<p>To see what the current working directory is, you can execute the command</p>
+
+<p><code>getwd()</code></p>
+
+<p>in the Console window. Try it now!</p>
+
+<p>If all went well the latter half of the working directory will state &quot;/r_course&quot;</p>
+
+</article></slide><slide class=''><hgroup><h2>Creating a new R script</h2></hgroup><article  id="creating-a-new-r-script">
+
+<ul>
+<li>Start by creating an R script file that will contain all the steps taken to get to a certain result.</li>
+<li>Initially a scrapbook to note down what exactly you did.</li>
+<li>Annotate scritpos with <code># Comments</code></li>
+<li>During this course, we will create an R script file for every exercise that contains the steps of that particular exercise (for instance a file named &quot;exercises_day1.R&quot;) and a common R script file that contains all functions that need to be reused between different exercises (for instance a file named &quot;functions.R&quot;).</li>
+</ul>
+
+</article></slide><slide class=''><hgroup><h2>How to run the code in RStudio</h2></hgroup><article  id="how-to-run-the-code-in-rstudio">
+
+<p>This R-markdown document contains code chunks:</p>
+
+<pre class = 'prettyprint lang-r'># a code chunk begins with ```{r}
+y &lt;- rnorm(100)
+x &lt;- sum(y)
+x</pre>
+
+<pre >## [1] -5.734114</pre>
+
+<pre class = 'prettyprint lang-r'># and ends with ```</pre>
+
+</article></slide><slide class=''><hgroup><h2>Running your first R-code</h2></hgroup><article  id="running-your-first-r-code">
+
+<p>These so called code chunks contain R code that does something:</p>
+
+<p>For example: calculate the mean of 100 random numbers between 0 and 50. Without running the code, can you guess what the mean will approximately be?</p>
+
+<pre class = 'prettyprint lang-r'># ?runif
+random &lt;- runif(n = 100, min = 0, max = 50)
+mean(random)</pre>
+
+<p><em><em>Try adjusting the <code>n = 100</code> argument, to a larger or smaller number</em></em></p>
+
+</article></slide><slide class=''><hgroup><h2>Run the code chunks as follows:</h2></hgroup><article  id="run-the-code-chunks-as-follows">
+
+<p>place the cursor somewhere in a code chunk and between the <code>```{r}</code> and the <code>```</code> and press the keys:</p>
+
+<p><code>Ctrl</code> <code>Shift</code> and <code>Enter</code> simultaneously.</p>
+
+<p>The code will run and the results will show either in the console, or below the code chunk.</p>
+
+</article></slide><slide class=''><hgroup><h2>Run a line of code as follows:</h2></hgroup><article  id="run-a-line-of-code-as-follows">
+
+<ul>
+<li>Place the cursor somewhere on the line that you want to run.</li>
+<li>Press the keys:</li>
+</ul>
+
+<p><code>Cntrl</code> and <code>Enter</code> simultaneously.</p>
+
+<p>You can also run a piece of code by selecting the code by dragging the cursor and left-click mouse, and entering:</p>
+
+<code>Cntrl</code> and <code>Enter</code> simultaneously. 
+<script type="application/shiny-prerendered" data-context="server-start">
+knitr::opts_chunk$set(echo = TRUE, fig.width = 5, fig.height = 3)
+</script>
+ <!--html_preserve-->
+
+<script type="application/shiny-prerendered" data-context="dependencies">
+{"type":"list","attributes":{},"value":[{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["bootstrap"]},{"type":"character","attributes":{},"value":["3.3.5"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmd/h/bootstrap-3.3.5"]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["viewport"]}},"value":[{"type":"character","attributes":{},"value":["width=device-width, initial-scale=1"]}]},{"type":"character","attributes":{},"value":["js/bootstrap.min.js","shim/html5shiv.min.js","shim/respond.min.js"]},{"type":"character","attributes":{},"value":["css/bootstrap.min.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["rmarkdown"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["ioslides"]},{"type":"character","attributes":{},"value":["13.5.1"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmd/ioslides/ioslides-13.5.1"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["js/modernizr.custom.45394.js","js/prettify/prettify.js","js/prettify/lang-r.js","js/prettify/lang-yaml.js","js/hammer.js","js/slide-controller.js","js/slide-deck.js"]},{"type":"character","attributes":{},"value":["fonts/fonts.css","theme/css/default.css","theme/css/phone.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["rmarkdown"]},{"type":"logical","attributes":{},"value":[true]}]}]}
+</script>
+
+<!--/html_preserve--></article></slide>
+
+
+  <slide class="backdrop"></slide>
+
+</slides>
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+<!-- map slide visiblity events into shiny -->
+<script>
+  (function() {
+    if (window.jQuery) {
+       window.jQuery(document).on('slideleave', function(e) {
+         window.jQuery(e.target).trigger('hidden');
+      });
+       window.jQuery(document).on('slideenter', function(e) {
+         window.jQuery(e.target).trigger('shown');
+      });
+    }
+  })();
+</script>
+
+</body>
+</html>

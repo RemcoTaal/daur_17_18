@@ -1,0 +1,395 @@
+---
+title: "R basics - Exercise"
+author: "Marc A.T. Teunis"
+date: '`r Sys.Date()`'
+output: 
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+---
+
+This document is an R Markdown Tutorial (create with the `learnr` package)
+An example of the use of _literate programming_ in R. R Markdown is based on the Markdown mark-up language used for easy writing for the web and can combine plain human-readable text with computer code and output from that code in one document. 
+
+`learnr` is an implementation of `Shiny` apps. See http://www.rstudio.com/shiny for more information.
+
+Type code in empty blocks or run the pre-defined code by clicking the `Run Code` button.
+Clicking `Start Over` clears the exercise and enables you to begin again.
+
+## The data
+In the first part of this tutorial we use the data from the the in R available demo dataset: `Theoph`
+
+Boeckmann, Sheiner and Beal (1994) report data from a study by Dr. Robert Upton of the kinetics of the anti-asthmatic drug theophylline. Twelve subjects were given oral doses of theophylline then serum concentrations were measured at 11 time points over the next 25 hours.
+
+```{r setup, include=FALSE}
+#knitr::opts_chunk$set(echo = TRUE, 
+#                      warning = TRUE, 
+#                      message = TRUE, 
+#                      error = TRUE)
+library(learnr)
+tutorial_options(exercise.timelimit = 60)
+#tutorial_options(exercise.checker = checkthat::check_exercise)
+knitr::opts_chunk$set(error = TRUE)
+```
+
+## Packages
+```{r load_packages, exercise = TRUE}
+library(tidyverse)
+library(utils)
+```
+
+## Aim of the tutorial
+In this tutorial you will:
+
+ * Get a first glimpse at R and it's language syntax
+ * Write a few lines of code
+ * Load an example dataset
+ * Create exploratory data visualizations 
+ * Inspect thee dataset
+ * Do calculations
+
+## Load example dataset
+
+Type `data` in the field below, under the predefined code. Click `Run Code`
+What happens?
+
+```{r load_data, exercise = TRUE, exercise.lines = 7, warning=FALSE, error=FALSE}
+library(tidyverse)
+library(datasets)
+data <- as_tibble(datasets::Theoph)
+
+
+
+
+```
+
+## Getting help
+
+To get help on a function, a package or a dataset, type `?package/function/dataset_name`
+Can you use `?dataset_name` to learn something about the `` dataset.
+```{r getting_help, exercise = TRUE}
+?datasets::Theoph
+
+```
+
+From the help on `Theoph` answer the following question.
+```{r quiz, echo=FALSE}
+quiz(
+  question("Theoph is short for theophylline, which is an",
+    answer("Anti-inflammatory drug"),
+    answer("Anti-asthmatic drug", correct = TRUE),
+    answer("Anti-rheumatoid drug"),
+    answer("Anti-cancer drug"),
+allow_retry = TRUE, random_answer_order = TRUE))
+```
+
+## Inspecting a dataframe
+
+Click "Run Code" to see the code
+
+ - How do we inspect `data`?
+ - How many variables does `data` have?
+ - How many rows?
+ - Call `summary()` on `data`; 
+ In which variable do we observe the highest measured value ratio?
+
+Try the code in the Code fields or type in the fields and 
+click "Run Code"
+
+### Head tail, and dimensions
+Try the commands `head(data)`, `tail(data)` and `dim(data)` below.
+```{r, inspect_th_a, exercise = TRUE}
+data <- as_tibble(datasets::Theoph)
+head(data)
+class(data)
+
+## use tail() and dim() functions on data:
+
+
+```
+
+### Number of variables
+Type `ncol(data)`. What does this command do?
+```{r, inspect_th_b, exercise = TRUE}
+data <- as_tibble(datasets::Theoph)
+
+
+```
+
+### Number of rows
+Type `nrow(data)`. What does this do? 
+```{r, inspect_th_c, exercise = TRUE}
+data <- as_tibble(datasets::Theoph)
+
+
+```
+
+## Exploring the `Theop` data
+
+R is great for visualizing you data. Discuss with your neighbour: which variables would you plot first in this dataset?
+
+Run the code below to see the first graph
+```{r, plot_1, exercise = TRUE}
+data <- as_tibble(datasets::Theoph)
+head(data)
+
+plot_1 <- data %>%
+  ggplot(aes(x = conc)) +
+  geom_histogram(aes(y=..density..),      
+                   bins = 30,
+                   colour = "black", fill = "white") +
+    geom_density(alpha = .2, fill = "Blue") + xlab("value") +
+  xlab("Concentration")
+
+plot_1
+
+```
+
+### Scatter plots are a good way to start too
+What do you think about the relationship btween Time and concentration of theophylline?
+```{r, plot_2_scatter, exercise = TRUE}
+data <- as_tibble(datasets::Theoph)
+plot_2 <- data %>%
+  ggplot(aes(x = Time, y = conc)) +
+  geom_point() 
+
+plot_2
+```
+
+### Adding a smooth line can help discover a pattern.
+What do you think is the grey area? 
+
+```{r, plot_3_smooth, exercise = TRUE}
+data <- as_tibble(datasets::Theoph)
+
+plot_3 <- data %>%
+  ggplot(aes(x = Time, y = conc)) +
+  geom_point()  + 
+  geom_smooth()
+
+plot_3
+```
+
+### Different doses 
+Different doses were administered. Discuss with you neighbour how you could visualize this.
+Let's add a bit of colour. What do you think is the realtionship between Dose and Subject. Did every Subject recieve the same dose?
+```{r, plot_4_colours, exercise = TRUE}
+data <- as_tibble(datasets::Theoph)
+
+data$Dose <- as.factor(data$Dose)
+
+plot_4 <- data %>%
+  ggplot(aes(x = Time, y = conc)) +
+  geom_point(aes(colour = Dose)) 
+
+plot_4
+```
+
+### Where are the individual Subjects in the data?
+Run the code below. what does the command `facet_wrap(~ Subject) do?
+What do you think, are there many differences between subjects in the kinectics of theophylline in vivo?
+```{r, plot_5_facets, exercise = TRUE}
+data <- as_tibble(datasets::Theoph)
+
+data$Dose <- as.factor(data$Dose)
+
+plot_5 <- data %>%
+  ggplot(aes(x = Time, y = conc)) +
+  geom_point(aes(colour = Dose)) +
+  facet_wrap(~ Subject)
+
+plot_5
+```
+
+### Adding a line per subject is easy!
+```{r, plot_6_smoothers, exercise = TRUE}
+data <- as_tibble(datasets::Theoph)
+
+data$Dose <- as.factor(data$Dose)
+
+plot_6 <- data %>%
+  ggplot(aes(x = Time, y = conc)) +
+  geom_point(aes(colour = Dose)) +
+  geom_smooth(se = FALSE) +
+  facet_wrap(~ Subject)
+
+plot_6
+```
+
+
+## Summary data
+Call `summary(Theoph)`. Can you determine the maximum value in the dataset?
+How can you use the command `max()` to achieve the same?
+```{r, inspect_th_d, exercise = TRUE}
+
+
+
+```
+
+```{r, inspect_th_d-solution, include=FALSE}
+summary(Theoph)
+
+
+```
+
+```{r, inspect_th_d-check}
+
+"Well done!"
+
+```
+
+## Another example; Toxicity data
+
+From Teunis M., Corsini E., Smits M, Madsen C.B., Eltze T., Ezendam J., Galbiati V.,
+Gremmer E., Krul C., Landin A., Landsiedel R., Pieters R., Rasmussen T.F., Reinders J.,
+Roggen E., Spiekstra S., Gibbs S. Transfer of a two-tiered keratinocyte assay:
+IL-18 production by NCTC2544 to determine the skin sensitizing capacity and
+epidermal equivalent assay to determine sensitizer potency. Toxicol In Vitro.
+2013 Apr;27(3):1135-50. doi: 10.1016/j.tiv.2012.06.004. Epub 2012 Jun 19. PubMed 
+PMID: 22728231.
+
+http://www.sciencedirect.com/science/article/pii/S0887233312001543?via%3Dihub 
+
+Run the Code below. Do you remember from above how to inspect the data to learn what variables it contains?
+
+### Loading data
+
+<div id="create_vector_b-hint">
+**Hint:** To inspect the data call `head(data_table)`.
+</div>
+
+```{r, nctc_load, exercise = TRUE}
+library(readxl)
+library(readr)
+
+URL <- "https://www.innovativetesting.nl/sites/default/files/attachment/NCTC%20data%20all%20participants%20DTU%20and%20UNIMI%20corrected%20%282%29.csv"
+destfile <- "nctc.csv"
+download.file(URL, destfile)
+
+nctc <- read_csv(file = destfile)
+
+nctc <- nctc[-c(1:2),c(1:8)]
+nctc 
+```
+
+### Cleaning the variables in the dataset
+The names of the variables in the `nctc` datatable can be viewed by calling `names(nctc)`
+```{r, nctc_clean, exercise = TRUE}
+
+library(tidyverse)
+URL <- "https://www.innovativetesting.nl/sites/default/files/attachment/nctc2.csv"
+destfile <- "nctc.csv"
+download.file(URL, destfile)
+
+#nctc <- readRDS(file = "./nctc.RDS")
+ nctc <- read_csv(file = destfile)
+nctc <- nctc[-c(1:2),c(1:8)]
+
+names(nctc) <- tolower(names(nctc))
+names(nctc) <- gsub(pattern = "-", replacement = "", names(nctc))
+names(nctc) <- gsub(pattern = "\\.", replacement = "", names(nctc))
+
+nctc$lab <- as.factor(nctc$lab)
+nctc$compound <- as.factor(nctc$compound)
+nctc$conc <- as.factor(nctc$conc)
+nctc$exp <- as.factor(nctc$exp)
+nctc$rep <- as.factor(nctc$rep)
+nctc$viability <- as.numeric(nctc$viability)
+nctc$il18 <- as.numeric(nctc$fold)
+
+head(nctc)
+
+## saveRDS(nctc, file = "./nctc.RDS")
+
+```
+
+## Exploratory data analysis; NCTC data
+```{r, eda_nctc, exercise = TRUE}
+#nctc <- readRDS(file = "./nctc.RDS")
+nctc <- read_csv(file = destfile)
+nctc <- nctc[-c(1:2),c(1:8)]
+
+names(nctc) <- tolower(names(nctc))
+names(nctc) <- gsub(pattern = "-", replacement = "", names(nctc))
+names(nctc) <- gsub(pattern = "\\.", replacement = "", names(nctc))
+
+nctc$lab <- as.factor(nctc$lab)
+nctc$compound <- as.factor(nctc$compound)
+nctc$conc <- as.factor(nctc$conc)
+nctc$exp <- as.factor(nctc$exp)
+nctc$rep <- as.factor(nctc$rep)
+nctc$viability <- as.numeric(nctc$viability)
+nctc$il18 <- as.numeric(nctc$fold)
+
+
+nctc_summary <- nctc %>%
+  na.omit() %>% 
+  group_by(conc, compound) %>%
+  summarise(mean_viab = mean(viability),
+            mean_il18 = mean(il18),
+            mean_fold = mean(fold))
+head(nctc_summary)  
+summary(nctc_summary)
+
+saveRDS(nctc_summary, file = "./nctc_summary.RDS")
+
+```
+
+### All compounds
+```{r, all_compounds, exercise = TRUE}
+library(tidyverse)
+
+nctc_summary <- readRDS(file = "./nctc_summary.RDS")
+
+ggplot(data = nctc_summary, aes(x = compound, y = mean_viab)) +
+  geom_point() +
+  geom_hline(aes(yintercept = 100), colour = "Blue", size = 2)
+
+```
+
+### One compound
+Let's select the compound with the highest IL-18 induction
+Which compund has highest IL-18 induction?
+```{r, highest_il-18, exercise = TRUE}
+library(tidyverse)
+nctc_summary <- readRDS(file = "./nctc_summary.RDS")
+
+high_il18 <- nctc_summary %>% 
+ filter(mean_il18 >= 3.0) %>%
+  arrange(desc(mean_il18))
+
+```
+
+### Highest IL-18 plot
+```{r, highest_il-18_plot, exercise = TRUE}
+library(tidyverse)
+
+nctc_summary <- readRDS(file = "./nctc_summary.RDS")
+
+compound_x <- nctc_summary %>%
+  filter(compound == "58") %>%
+  arrange(conc)
+ 
+ggplot(data = compound_x, aes(x = conc, y = mean_il18)) +
+  geom_bar(position = "dodge", stat = "identity")
+```
+
+### Let's add a compound that has no high IL-18 expression
+```{r, add_no_high_il-18_to_plot, exercise = TRUE}
+library(tidyverse)
+nctc_summary <- readRDS(file = "./nctc_summary.RDS")
+
+low_il18 <- nctc_summary %>% 
+ filter(mean_il18 <= 1.0) %>%
+  arrange(desc(mean_il18))
+
+compound_xy <- nctc_summary %>%
+  filter(compound == "58" | compound == "121") %>%
+  arrange(compound, conc)
+ 
+ggplot(data = compound_xy, aes(x = conc, y = mean_il18)) +
+  geom_bar(aes(fill = compound), position = "dodge", stat = "identity")
+
+```
+

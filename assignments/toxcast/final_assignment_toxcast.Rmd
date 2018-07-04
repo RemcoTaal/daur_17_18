@@ -1,0 +1,266 @@
+---
+title: "Course Final Assignment 'ToxCast'"
+author: "Marc Teunis"
+date: '`r Sys.Date()`'
+output:
+  html_document:
+    css: ~/hp_r_course/exercises/exercises_style.css
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, 
+                      #results = "hide", 
+                      #fig.show = 'hide',
+                      warning = FALSE,
+                      message = FALSE, 
+                      error = FALSE
+                      )
+```
+
+# Directions
+
+## Package suggestion, you may need others!
+
+```{r, echo=TRUE}
+library(tidyverse)
+```
+
+ _*Use ggplot2 syntaxis for all the figures in this assigment study*_
+
+ _*Use packages of the tidyverse, or any other package you think you need to solve the questions below*_ 
+ 
+ _*Use this Rmarkdown template to create a report adressing the assignment below*_ 
+ 
+ _*Hand in the assignment at or before the deadline: 15 September, 2017*_
+
+## Grading
+For more information on the grading of the assignment and the review criteria, see the document "grading_documents.html"
+
+## Introduction
+For the assessment of potential harmful exffects of chemicals, animal testing is required. Recently, a large study was conducted called "ToxCast". 
+
+## The data
+The data can be found in the folder "./assignments/toxcast/"
+
+Remember `rprojroot`?
+```{r, root_1, echo=TRUE}
+## defines the root of the project for later use
+require("rprojroot") || utils::install.packages("rprojroot")
+library(rprojroot)
+root <- find_root_file(criterion = is_rstudio_project)
+```
+
+The file that you need to read into R is:
+```{r, echo=TRUE}
+data_file <- list.files(file.path(root, "assignments", "toxcast"), pattern = "^toxrefdb*", full.names = TRUE)
+```
+
+```{r, echo=FALSE}
+# read data 
+toxcast <- read_csv(file = data_file, na = "NULL")
+```
+
+Once loaded into R the data should have the dimensions
+`r dim(toxcast)`, rows by columns.
+
+For more details on the data see: 
+ftp://newftp.epa.gov/comptox/High_Throughput_Screening_Data/Animal_Tox_Data/
+The data was downloaded from this website on 11 July 2017
+
+## General TIPS
+
+ - Inspect the data
+ - Look at complete cases 
+ - Remove NAs
+ - Tidy data if necessary
+ - Solve overplotting issues by using `alpha` and/or `facet_wrap`
+ - The Rmd file you write must include all the steps of the analysis, including data load and graphics
+ - For this case you need to know about importing data in R. The file is csv format, remember to set the `na.strings`. In this dataset NA's are indicated by the term `NULL` Determine the delimiter used in the datafile. 
+ - Remember the programming rules: use `snake_case` for all variables in the data and in your script.
+ - Use the syntax from the {tidyverse} as much a possible
+ - You are allowed to use google/stack overflow, whatever you can find to solve the questions
+ - All graphics must be made with {ggplot2}
+ - Remember {dplyr} to `select()`, `filter()`, `group_by()`, `mutate()` and `summarize()` data
+ - Check the type of each variable in the data. Do you need to change the variable type like `data$var_1 <- as.factor(data$var_1)`?
+ - All graphs need to have proper titles and axis labelling
+ 
+## The case assignment
+ 1) Create a github repository "toxcast_assignment" in your account.
+ 2) Read the data into R 
+ 3) Inspect the data 
+ 4) Describe missing values and the type of variables
+ 5) Generate __**at least 4**__ different graphs that describe the data
+ 6) Describe all the steps you performed to load, clean, tidy, wrangle and visualize the data
+ 7) Explain why you select certain variables or make other selections or changes
+ 8) Answer the case questions below.
+ 9) Upload a rendered (__**github_document**__) and the associated *.Rmd file (name the files both: "toxcast_assignment") to your github account with the solutions to the assignment
+ 10) Sent the teacher an email with the link to the files (the repository), before the deadline
+ 
+# Case questions
+
+Try to answer the next 4 questions with a graph and narratives explaining what can be seen in the graph:
+
+Write a general conclusion on the four graphs you create.
+
+## Graph 1) Plotting two categorical variables, and prevent overplotting.
+
+## 1A) How does the relationship between the chemicals ("chemical_name") and the "effect_category" variable look?
+ 
+**TIPS**
+
+ - This is a plot with two categorical variables. 
+ - To prevent overplotting, do you need to use `geom_jitter(possition = "jitter")`?
+ - Remember setting `alpha()`?
+ - Try using facets.
+
+**ANSWER**
+```{r, fig.width=20, fig.height=13}
+#?sample
+names(toxcast) 
+ggplot(data = sample_frac(toxcast, 1), aes(x = species, y = effect_category)) +
+  geom_point(alpha = 1/9) +
+  geom_jitter(position = "jitter") +
+  facet_wrap( ~ guideline_name) +
+  theme_bw(base_size = 30) +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) 
+  
+
+```
+ 
+## 1B) Which species is most frequently represented in the data?
+Write a number of code lines to determine the number of animals used for the species that is the most frequently represented in the data.
+Use the variable `species` to substantiate you claim.
+
+**ANSWER**
+```{r}
+str(toxcast$species)
+toxcast$species <- as.factor(toxcast$species)
+
+(species <- toxcast %>%
+  count(species))
+## or
+pander::pander(table(toxcast$species))
+```
+
+## Graph 2) A categorical and a continuous variable 
+**Use only the data for the dog in this graph, and only for the chemicals below:** 
+
+ - "Sulfentrazone" 
+ - "Cyproconazole"
+ - "Thiamethoxam"
+ - "Glufosinate-ammonium"
+ - "Flusilazoleand"
+
+## 2A) Plot the relationships between the "chemical_name"" of the selected chemicals above and the "noael_dose" variable for the __**rats**__ only?
+
+**TIPS**
+
+ - Select the variables in the dataset that you need, generate a subset of the data in a new dataframe
+ - Filter the data for only the **rat**-data
+ - You need to `group_by` the `species` and the `chemical_name`
+ - You will need to summarize the `noael_dose`
+ - Maybe you can use facets, for example to see information on the chemicals (variable `guideline_no`?)
+ - Do you need to remove NAs? with `na.omit()`
+ - try `geom_jitter(position = "jitter")`
+
+**ANSWER**
+```{r, fig.width=10, fig.height=10}
+table_chemicals <- as_tibble(table(toxcast$chemical_name))
+toxcast <- na.omit(toxcast)
+class(toxcast)
+toxcast$chemical_name <- as.factor(toxcast$chemical_name)
+levels(toxcast$species)
+
+## subsetting the data
+toxcast_selected <- toxcast %>%
+  dplyr::select(chemical_name, 
+                species, 
+                noael_dose) %>%
+  filter(species == "rat", 
+         chemical_name == "Sulfentrazone" |
+         chemical_name == "Cyproconazole" |
+         chemical_name == "Thiamethoxam" |
+         chemical_name == "Glufosinate-ammonium" |
+         chemical_name == "Flusilazoleand") %>%
+  group_by(chemical_name, species) #%>%
+  #summarise(mean_noael = mean(noael_dose)) 
+toxcast_selected
+## graph
+toxcast_selected %>%
+  ggplot(aes(x = chemical_name, y = noael_dose)) +
+  geom_boxplot(size = 1.5) +
+theme_bw(base_size = 30) +
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+#  facet_wrap( ~ guideline_no)
+# ?geom_jitter
+```
+
+## 2B) Toxicity?
+Which of the chemicals under 2A is the most harmful. Remember that noael stand for "no-observed adverse effect level" which is the concentration for which no effect was observed.
+
+**ANSWER**
+```{r}
+## the chemicals with the lowest noael are the most harmful, Cypro and Sulfe are approx. equally harmful according the noael levels in the graph 
+```
+
+## Graph 3) Two continuous variables - a panel with two plots
+Look at the relationship between the `loael_dose` and the `noael_dose`. Plot a graph That shows the correlation between these variables for all the data in the ToxCast dataset. You will discover that there are two outliers for the Mouse. In a second graph, plot the same data but zoom in to the bulk of the data. Use x = 3000 (loael_dose) as a cut-off for the x-axis and y = 1000 (noael_dose) for the y-axis  
+
+**TIPS** 
+
+ - To zoom in on data use the layer `coord_cartesian(ylim=c(0, 1000))` and  `coord_cartesian(xlim=c(0, 3000))`. Add these to you plot
+ - You can use `cowplot::plot_grid()` to plot graphs in a panel
+ - You will get a bonus if you plot the names of the chemicals at the two outlier point in the first graph of the panel 
+
+**ANSWER**
+```{r, fig.width=25, fig.height=13}
+names(toxcast)
+
+plot_a <- toxcast %>% 
+ggplot(aes(x = loael_dose, y = noael_dose)) +
+  geom_point(aes(color = species), alpha = 1/2, size = 5) +
+  theme_bw(base_size = 25) + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+plot_a
+
+plot_b <- toxcast %>% 
+ggplot(aes(x = loael_dose, y = noael_dose)) +
+  geom_point(aes(color = species), alpha = 1/2, size = 5) +
+  coord_cartesian(xlim = c(0, 3000)) +
+  coord_cartesian(ylim = c(0, 1000)) +
+  theme_bw(base_size = 30) + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+plot_b
+
+panel <- cowplot::plot_grid(plot_a, plot_b)
+panel
+
+# the outliers
+(outliers <- toxcast %>% select(chemical_name, loael_dose, noael_dose) %>%
+  filter(noael_dose > 3000, loael_dose > 4000))
+labels <- outliers$chemical_name
+
+# add labels to plot
+plot_a <- toxcast %>% 
+ggplot(aes(x = loael_dose, y = noael_dose)) +
+  geom_point(aes(color = species), alpha = 1/2, size = 5) +
+  geom_label(data = outliers, aes(x = loael_dose, y = noael_dose, label = labels), hjust = 1.1, size = 10) +
+  theme_bw(base_size = 30) + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+plot_a
+#?geom_label
+panel <- cowplot::plot_grid(plot_a, plot_b)
+panel
+```
+
+## Graph 4) Free choice
+Generate a plot of your choosing. It can contain any data from the ToxCast dataset.
+
+You may plot whatever you think is useful to study effects of the chemicals on the animals in the dataset. Be sure to tell a nice story about what can be discovered from your plot.
+
+**ANSWER**
+
+

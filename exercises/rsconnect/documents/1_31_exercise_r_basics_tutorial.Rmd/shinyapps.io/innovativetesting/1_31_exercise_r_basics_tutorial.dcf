@@ -1,0 +1,13 @@
+name: 1_31_exercise_r_basics_tutorial
+title: 1_31_exercise_r_basics_tutorial
+username:
+account: innovativetesting
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 223591
+bundleId: 1019204
+url: https://innovativetesting.shinyapps.io/1_31_exercise_r_basics_tutorial/
+when: 1507643284.41528
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: 1_1_exercise_getting_started.Rmd|1_2_exercise_hello_world.html|1_2_exercise_hello_world.Rmd|1_31_exercise_r_basics.html|1_31_exercise_r_basics.Rmd|1_31_exercise_r_basics_tutorial.html|1_32_exercise_vectors.html|1_32_exercise_vectors.Rmd|1_41_exercise_access_select.html|1_41_exercise_access_select.Rmd|1_42_matrix_dataframes_exercise.html|1_42_matrix_dataframes_exercise.Rmd|1_43_exercise_dplyr_data.html|1_43_exercise_dplyr_data.Rmd|1_5_exercise_visualizations.html|1_5_exercise_visualizations.md|1_5_exercise_visualizations.Rmd|2_01_demo_readxl.html|2_01_demo_readxl.Rmd|2_1_exercise_import_data.html|2_1_exercise_import_data.Rmd|3_1_exercise_regex_strings.html|3_1_exercise_regex_strings.Rmd|3_3_exercise_eda_calux.html|3_3_exercise_eda_calux.md|3_3_exercise_eda_calux.Rmd|3_5_exercise_factors.html|3_5_exercise_factors.Rmd|3_5_exercise_tidydata.html|3_5_exercise_tidydata.Rmd|4_1_exercise_vectors_programming.Rmd|4_3_exercise_writing_functions.html|4_3_exercise_writing_functions.Rmd|5_1_rna_seq_demo.Rmd|5_1_Visualisation of proteomics data using R and Bioconductor.htm|5_2_rna_seq_demo.Rmd|5_3_1_Using R to draw a Heatmap from Microarray Data.htm|5_3_2_creating_heatmaps.Rmd|5_4_Reading the NCBI's GEO microarray SOFT files in R_BioConductor.htm|6_1_statistics_exercises.Rmd|adding_names_to_rows_and_columns_in_matrix.R|dplyr_power_households.R|exercise_template.Rmd|exercises_style.css|1_31_exercise_r_basics_tutorial_files/figure-html/unnamed-chunk-12-1.png|1_31_exercise_r_basics_tutorial_files/figure-html/unnamed-chunk-13-1.png|5_2_EBImage_demo/ebimage_demo.Rmd|2_001_2017-useR-reproducibility|5_1_Visualisation of proteomics data using R and Bioconductor_bestanden|5_3_Using R to draw a Heatmap from Microarray Data_bestanden|5_4_Reading the NCBI's GEO microarray SOFT files in R_BioConductor_bestanden|5_5_rene_van_der_ploeg|answers

@@ -1,0 +1,678 @@
+---
+title: "Stability and Homogeneity"
+author: "BJC"
+date: "April 9, 2015"
+output: html_document
+---
+
+Stability and Homogeneity
+========================================================
+This Rmd file tests for a progressive change in the microbial communities at each body site over the course of pregnancy. Three properties of these communities were tested: Alpha-diversity, Instability (as characterized by the distance between consecutive samples within a subject), and Beta-diversity (between subjects). Figure 1 and the related Supplementary Figures 2-5 are herein produced, and all the statistical tests related to progressive change during pregnancy are herein performed.
+
+Initialize:
+```{r init, message=FALSE}
+library("phyloseq"); packageVersion("phyloseq")
+library("ggplot2"); packageVersion("ggplot2")
+#library("igraph"); packageVersion("igraph")
+library("nlme"); packageVersion("nlme")
+library("reshape2"); packageVersion("nlme")
+library("gridExtra")
+set.seed(100)
+default.par <- par(no.readonly = TRUE)
+options(stringsAsFactors = FALSE)
+theme_set(theme_bw())
+ANSIZE=2   # Plot visual parameter
+PVALLEN=5  # Plot visual parameter
+```
+
+Load data:
+```{r load-data, message=FALSE}
+setwd("~/Pregnancy")
+otu_file <- "PregnancyClosed15.RData"
+load(otu_file)
+```
+
+# Alpha-diversity During Pregnancy
+
+## Calculate alpha-diversity
+
+Calculate the diversities, using three metrics (Shannon, Chao1, Simpson), for each sample during pregnancy, keeping only those >=10 weeks (since almost no subjects provided samples before then):
+```{r}
+meths = c("Shannon", "Chao1", "Simpson")
+divdfs <- list()
+
+for(site in sites) {
+  # Estimate diversity and make data frame
+  ps <- PSPreg[[site]]
+  ps <- prune_samples(sample_data(ps)$GWColl >= 10, ps)
+  erDF <- estimate_richness(ps, split = TRUE, measures = meths)
+  df <- data.frame(erDF, sample_data(ps))
+  for(meth in meths) { df[,paste0("log", meth)] <- log(df[,meth]) }
+  divdfs[[site]] <- df
+}
+```
+
+Histogram the distributions of the calculated diversity metrics:
+```{r warning=FALSE}
+df <- do.call(rbind, divdfs)
+df <- melt(df, id.vars=c("SampleID","BodySite"), measure.vars=c("Chao1", "Shannon", "Simpson"))
+p <- ggplot(data=df, aes(x=value))
+p <- p + geom_histogram(aes(y=..count..))
+p + facet_grid(BodySite ~ variable, scales="free")
+```
+
+## Normality and transforms
+
+For Shannon and Chao1, normality looks acceptable except for the Vaginal Swab site. Simpson is more questionable, but since Shannon is our main focus we'll let that be. The crucial thing is that the Vaginal Swab diversity strongly deviates from normality, therefore lets try to transform it to improve normality before fitting. Checking the key part:
+
+```{r log-vag-hist}
+dfv <- df[df$BodySite=="Vaginal_Swab",]
+dfv$log_value <- log(dfv$value)
+dfv$sqrt_value <- sqrt(dfv$value)
+pnone <- ggplot(data=dfv, aes(x=value))
+pnone + geom_histogram(aes(y=..count..)) + facet_wrap(~variable, scales="free")
+plog <- ggplot(data=dfv, aes(x=log_value))
+plog + geom_histogram(aes(y=..count..)) + facet_grid(~variable, scales="free")
+psqrt <- ggplot(data=dfv, aes(x=sqrt_value))
+psqrt + geom_histogram(aes(y=..count..)) + facet_grid(~variable, scales="free")
+```
+
+While not perfect, the log-transform clearly improved the normality substantially. Given the previous use of log-transformed shannon vaginal diversity in the literature, we'll go ahead and use this for futher analysis of this data:
+
+## LME modeling
+
+We use a linear-mixed-effects model for the relationship of alpha-diversity and gestational time, with a Subject-dependent intercept/slope as the random effect:  
+```{r model-alpha}
+# Plotting parameters for each measure
+pvs <- list(Shannon=list(ymin=0, ymax=5, ylab="Alpha-diversity (Shannon)", xan = 30, yan=4.8),
+           Chao1=list(ymin=0, ymax=300, ylab="Alpha-diversity (Chao1)", xan = 30, yan=288),
+           Simpson=list(ymin=0, ymax=1.2, ylab="Alpha-diversity (Simpson)", xan = 30, yan=1.15))
+
+ggs_alpha <- list() # List of ggplot graphs for each site/method
+models_alpha <- list() # List of returns from the lme(...) model fitting function
+
+meths = c("Shannon", "Chao1", "Simpson")
+for(site in sites) {
+  df <- divdfs[[site]]
+  for(meth in meths) {
+    pv <- pvs[[meth]]
+    key <- paste(site, meth)
+    
+    # MLE modeling/plotting
+    new.dat <- data.frame(GWColl=10:40)
+    mlef <- formula(paste(meth, "~", "GWColl"))
+    if(site == "Vaginal_Swab") mlef <- formula(paste0("log", meth, "~ GWColl"))
+    model.mx <- lme(mlef, random = ~ 1+GWColl|SubjectID, data=df)
+    new.dat$pred <- predict(model.mx, newdata=new.dat,level=0)
+    
+    Designmat <- model.matrix(eval(eval(model.mx$call$fixed)[-2]), new.dat[-ncol(new.dat)])
+    
+    #compute standard error for predictions
+    predvar <- diag(Designmat %*% model.mx$varFix %*% t(Designmat))
+    new.dat$SE <- sqrt(predvar)
+    new.dat$hi2SE <- new.dat$pred + 2*new.dat$SE
+    new.dat$lo2SE <- new.dat$pred - 2*new.dat$SE
+
+    # Reverse the log-transform for the vaginal data
+    if(site == "Vaginal_Swab") {
+      new.dat$hi2SE <- exp(new.dat$pred + 2*new.dat$SE)
+      new.dat$lo2SE <- exp(new.dat$pred - 2*new.dat$SE)
+      new.dat$pred <- exp(new.dat$pred)
+    }
+    
+    #Extract p-value
+    pval <- summary(model.mx)$tTable["GWColl", "p-value"]
+    
+    # Build ggplot with confidence interval
+    p1 <- ggplot(new.dat,aes(x=GWColl,y=pred)) + 
+      geom_line(color="blue") +
+      geom_ribbon(aes(ymin=lo2SE,ymax=hi2SE),alpha=0.2,fill="blue") +
+      geom_point(data=df,aes_string(y=meth), size=0.5) +
+      xlab("Gestational Time (Weeks)") +
+      ggtitle(site) + 
+      ylim(pv$ymin, pv$ymax)
+    
+    # Special plot options for Tooth/Gum
+    if(site=="Tooth_Gum" & meth=="Chao1") { # More digits on this plot
+      p1 <- p1 + annotate("text", x=pv$xan, y=pv$yan, size=ANSIZE, label = paste("p =", substr(as.character(pval),1,6)))
+    } else {
+      p1 <- p1 + annotate("text", x=pv$xan, y=pv$yan, size=ANSIZE, label = paste("p =", substr(as.character(pval),1,PVALLEN)))
+    }
+
+    # Save ggplot in list
+    p1 <- p1 + ylab(NULL)
+    ggs_alpha[[key]] <- p1
+
+    # Summarize the LME model fit and save in list
+#    print(paste0(site, ": LME {nlme}"))
+#    print(summary(model.mx))
+    models_alpha[[key]] <- model.mx
+  }
+}
+
+# Show plot of the 3x4 models (3 methods, 4 sites) performed above
+listorder <- paste(sites, rep(meths, each=4))
+ggs_alpha <- ggs_alpha[listorder]
+do.call(grid.arrange,c(ggs_alpha, ncol=4, main=paste("Diversity vs. Gestational Time\nLME Modeling --", "Shannon,", "Chao1,", "Simpson")))
+```
+
+There is no significant fixed effect for a trend (slope) of diversity during pregnancy at any of the body sites.
+
+# Stability During Pregnancy
+
+As a proxy for community stability (or instability) we use the distance between consecutive samples of a community within a subject. As we are interested in trends during pregnancy, we will perform an analogous analysis on this measure of instability as we did on alpha-diversity above.
+
+## Calculate instability
+
+First we define a couple functions to extract the distances between consecutive samples:
+```{r}
+# Function to pull out SampleIDs by the GWColl
+getSamByGW <- function(x, cc) {
+  if(x %in% cc$GWColl) { 
+    return(cc$SampleID[which(x==cc$GWColl)][[1]])
+  } else { return(NA) }
+}
+
+# Function to calculate distance between two samples
+getDist2Sam <- function(sam1, sam2, ps, ...) {
+  phyloseq::distance(prune_samples(c(sam1, sam2), ps), ...)[[1]]
+}
+
+# Reduce down to those with previous samples
+samdat.prune_prev <- function(samdat) {
+  samdf <- data.frame(samdat)
+  subjects <- unique(samdf$SubjectID)
+  csub <- split(samdf, samdf$SubjectID)
+  for(sub in subjects) {
+    cc <- csub[[sub]]
+    cc$Prev <- ((cc$GWColl-1) %in% cc$GWColl)
+    cc$PrevID <- sapply(cc$GWColl-1, function(x) getSamByGW(x, cc))
+    if(sum(cc$Prev) == 0) {
+      csub[[sub]] <- NULL
+    } else {
+      cc <- cc[cc$Prev,]
+      csub[[sub]] <- cc
+    }
+  }
+  return(do.call(rbind, csub))
+}
+```
+
+Calculate distances between consecutive time points:
+```{r calc-prev-dists, warning=FALSE}
+###This requires more memory and multiple CPUS
+###managed by packages doParallel and foreach
+library("doParallel")
+library("foreach")
+registerDoParallel(makeCluster(3))
+
+samdf_prevs <- list()
+for(site in sites) {
+  ps <- PSPreg[[site]]
+  ps <- prune_samples(sample_data(ps)$GWColl >= 10, ps)
+  ps <- transform_sample_counts(ps, function(OTU) OTU/sum(OTU))
+  samdf_prevs[[site]] <- samdat.prune_prev(sample_data(ps))
+  rownames(samdf_prevs[[site]]) <- samdf_prevs[[site]]$SampleID
+  samdf_prev <- samdf_prevs[[site]]
+  samdf_prevs[[site]]$PrevBray <- mapply(getDist2Sam, samdf_prev$SampleID,
+        samdf_prev$PrevID, MoreArgs = list(ps=ps, method="bray"))
+  samdf_prevs[[site]]$logPrevBray <- log(samdf_prevs[[site]]$PrevBray)
+  samdf_prevs[[site]]$PrevJSD <- mapply(getDist2Sam, samdf_prev$SampleID,
+        samdf_prev$PrevID, MoreArgs = list(ps=ps, method="jsd"))
+  samdf_prevs[[site]]$logPrevJSD <- log(samdf_prevs[[site]]$PrevJSD)
+  samdf_prevs[[site]]$PrevWUF <- mapply(getDist2Sam, samdf_prev$SampleID,
+        samdf_prev$PrevID, MoreArgs = list(ps=ps, method="unifrac", weighted=T, parallel=T))
+  samdf_prevs[[site]]$logPrevWUF <- log(samdf_prevs[[site]]$PrevWUF)
+}
+```
+
+
+## Normality and transforms
+
+Histogram the distributions of the instability measure:
+```{r see-hists-2}
+df <- do.call(rbind, samdf_prevs)
+df <- melt(df, id.vars=c("SampleID","BodySite"), measure.vars=c("PrevBray", "PrevJSD", "PrevWUF"))
+p <- ggplot(data=df, aes(x=value))
+p <- p + geom_histogram(aes(y=..count..))
+p + facet_grid(variable~BodySite, scales="free")
+```
+
+Normality looks acceptable except for the Vaginal Swab site, again. We'll again try to transform it to improve normality before fitting. Checking the key part:
+```{r log-vag-hist-2}
+dfv <- df[df$BodySite=="Vaginal_Swab",]
+dfv$log_value <- log(dfv$value)
+dfv$sqrt_value <- sqrt(dfv$value)
+p <- ggplot(data=dfv, aes(x=value))
+p + geom_histogram(aes(y=..count..)) + facet_wrap(~variable, scales="free")
+p2 <- ggplot(data=dfv, aes(x=log_value))
+p2 + geom_histogram(aes(y=..count..)) + facet_wrap(~variable, scales="free")
+p3 <- ggplot(data=dfv, aes(x=sqrt_value))
+p3 + geom_histogram(aes(y=..count..)) + facet_wrap(~variable, scales="free")
+```
+
+Once again log is obvioulsy a major improvement in normality, if not perfect.
+
+## MLE modeling
+
+Fit and plot the distances between subsequent time points as a function of gestational weeks (GWColl):
+```{r plot-prev-dist}
+ggs_instability <- list()  # List of ggplots of instability vs. gestational time
+models_instability <- list() # List of return values from the lme(...) function
+meths <- c("Bray", "JSD", "WUF") # Distances to use
+# pvs: A list of graphical parameters for plotting
+pvs <- list(Bray=list(ymin=0, ymax=1, ylab="Instability (Bray)", xan = 30, yan=1),
+           JSD=list(ymin=0, ymax=1, ylab="Instability (JSD)", xan = 30, yan=1),
+           WUF=list(ymin=0, ymax=0.7, ylab="Instability (WUF)", xan = 30, yan=0.67))
+sites <- c("Vaginal_Swab", "Saliva", "Stool", "Tooth_Gum")
+
+for(site in sites) {
+  df <- samdf_prevs[[site]]
+  if(site == "Tooth_Gum") df <- df[-which(df$SampleID == "1002304148"),] 
+  # A mystery, lme hangs unless this specific sample is removed...
+  # "nlminb problem, convergence error code = 1
+  #  message = singular convergence (7)"
+  for(meth in meths) {
+    pv <- pvs[[meth]]
+    key <- paste(site, meth)
+
+    # MLE modeling/plotting
+    lmeControl(maxIter=500, msMaxIter=500)
+    lmef <- formula(paste(paste0("Prev",meth), "~", "GWColl"))
+    if(site == "Vaginal_Swab") lmef <- formula(paste0("logPrev", meth, "~ GWColl"))
+    model.mx <- lme(lmef, random = ~ 1+GWColl|SubjectID, data=df,
+                    control=lmeControl(maxIter=500, msMaxIter=500))
+    new.dat <- data.frame(GWColl=10:40)
+    new.dat$pred <- predict(model.mx, newdata=new.dat,level=0)
+    
+    #create design matrix
+    Designmat <- model.matrix(eval(eval(model.mx$call$fixed)[-2]), new.dat[-ncol(new.dat)])
+    
+    #compute standard error for predictions
+    predvar <- diag(Designmat %*% model.mx$varFix %*% t(Designmat))
+    new.dat$SE <- sqrt(predvar)
+    new.dat$hi2SE <- new.dat$pred + 2*new.dat$SE
+    new.dat$lo2SE <- new.dat$pred - 2*new.dat$SE
+#    new.dat$SE2 <- sqrt(predvar+model.mx$sigma^2)
+
+    # Reverse log-transform for the vaginal community
+    if(site == "Vaginal_Swab") {
+      new.dat$hi2SE <- exp(new.dat$pred + 2*new.dat$SE)
+      new.dat$lo2SE <- exp(new.dat$pred - 2*new.dat$SE)
+      new.dat$pred <- exp(new.dat$pred)
+    }
+    
+    #Extract p-value
+    pval <- summary(model.mx)$tTable["GWColl", "p-value"]
+
+    # Build ggplot with confidence interval 
+    p1 <- ggplot(new.dat,aes(x=GWColl,y=pred)) + 
+      geom_line(color="red") +
+      geom_ribbon(aes(ymin=lo2SE,ymax=hi2SE),alpha=0.2,fill="red") +
+      geom_point(data=df,aes_string(y=paste0("Prev",meth)), size=0.5) +
+      xlab("Gestational Time (Weeks)") +
+      annotate("text", x=pv$xan, y=pv$yan, size=ANSIZE, label = paste("p =", substr(as.character(pval),1,PVALLEN))) +
+      ylim(pv$ymin, pv$ymax)
+    
+    # Save ggplot in a list
+    p1 <- p1 + ylab(NULL)
+    ggs_instability[[key]] <- p1
+    
+    # Summarize the LME model and save to a list
+#    print(paste0(site, ": LME {nlme}"))
+#    print(summary(model.mx))
+    models_instability[[key]] <- model.mx
+  }
+}
+listorder <- paste(sites, rep(meths, each=length(sites)))
+ggs_instability <- ggs_instability[listorder]
+do.call(grid.arrange, c(ggs_instability, ncol=4, main=paste("Stability vs. Gestational Time\nLME Modeling --", "Bray,", "JSD,", "WUF")))
+```
+
+There is no significant fixed effect for a trend (slope) of instability during pregnancy at any of the body sites.
+
+
+# Beta-diversity During Pregnancy
+
+We now consider if there is any change in beta-diversity over the course of prengnacy, where beta-diversity is defined here as the average distance between subjects (at that gestational time).
+
+## Calculate beta-diversity and test for a significant trend
+
+Define functions:
+```{r}
+require("doParallel")
+require("foreach")
+registerDoParallel(makeCluster(3))
+# Function to pull out SampleIDs by the GWColl
+getSamByGW <- function(x, cc) {
+  if(x %in% cc$GWColl) { 
+    return(cc$SampleID[which(x==cc$GWColl)][[1]])
+  } else { return(NA) }
+}
+
+# Function to calculate distance between two samples
+getDist2Sam <- function(sam1, sam2, ps, ...) {
+  phyloseq::distance(prune_samples(c(sam1, sam2), ps), ...)[[1]]
+}
+
+GWSTART=10;GWEND=40
+gws <- seq(GWSTART, GWEND)
+
+# Function to get lm coeffs for the beta-diversity vs. gw fit
+get_mb <- function(ps, gwdists=NULL, permute=F) {
+  samdf <- data.frame(sample_data(ps))
+  subdfs <- split(samdf, samdf$SubjectID)
+  
+  if(permute) {
+    for(sub in names(subdfs)) {
+      if(runif(1) > 0.5) {
+        # Reversing in the GW10-40 range
+        subdfs[[sub]]$GWColl <- (GWSTART+GWEND-subdfs[[sub]]$GWColl)
+      }
+    }
+  }
+  
+  betas <- seq_along(gws)
+  names(betas) <- gws
+  for(gw in gws) {
+    sams <- sapply(subdfs, function(x) getSamByGW(gw, x))
+    sams <- sams[!is.na(sams)]
+    if(is.null(gwdists)) {
+      if(meth=="weighted unifrac") {
+        dists <- phyloseq::distance(prune_samples(sams, ps), method="unifrac", weighted=T, parallel=T)
+      } else {
+        dists <- phyloseq::distance(prune_samples(sams, ps), method=meth, parallel=T)
+      }
+    } else {
+      dists <- gwdists[[as.character(gw)]]
+      dists <- as.matrix(dists)
+#      print(gw)
+#      print(sams)
+      dists <- dists[sams, sams]
+      dists <- as.dist(dists)
+    }
+    
+    betas[[as.character(gw)]] <- mean(dists)
+  }
+  lmo <- lm(beta ~ gw, data.frame(beta=betas, gw=gws))
+  m <- lmo$coefficients[["gw"]]
+  b <- lmo$coefficients[["(Intercept)"]]
+  return(list(m=m, b=b, lmo=lmo))
+}
+```
+
+Calculate beta-diversities and estimate the trend between beta-diversity and gestational time. Show this estimated trend against the null distribution of trends estimated from the ensemble of randomly reversed time-courses. Determine pvalue by comparison to that null distribution (takes perhaps tens of minutes to run):
+```{r}
+meths <- c("bray", "jsd", "wuf")
+par(mfrow=c(2,2))
+NPERM=1000
+betadivs <- data.frame()
+mbs <- data.frame()
+mbs_perm <- data.frame()
+for(meth in meths) {
+  for(site in sites) {
+    ps <- PSPreg[[site]]
+    ps <- transform_sample_counts(ps, function(OTU) OTU/sum(OTU))
+    samdf <- data.frame(sample_data(ps))
+    
+    # Calculate the distance matrix for each pair of complementary gws
+    getDist <- function(gw, meth) phyloseq::distance(prune_samples(samdf$GWColl %in% c(gw, GWSTART+GWEND-gw), ps), method=meth, parallel=T)
+    getWUF <- function(gw) phyloseq::distance(prune_samples(samdf$GWColl %in% c(gw, GWSTART+GWEND-gw), ps), method="unifrac", weighted=T, parallel=T)
+    if(meth == "wuf") gwdists <- lapply(gws, getWUF)
+    else gwdists <- lapply(gws, getDist, meth=meth)
+    names(gwdists) <- gws
+    
+    fit <- get_mb(ps, gwdists=gwdists, permute=F)
+    m <- fit$m;b <- fit$b
+    
+    # Do the time-reversal permutations
+    pms <- rep(-999, NPERM); pbs <- rep(-999, NPERM)
+    for(ii in seq(1,NPERM)) {
+      pfit <- get_mb(ps, gwdists=gwdists, permute=T)
+      pms[[ii]] <- pfit$m
+      pbs[[ii]] <- pfit$b
+    }
+    
+    # plot the slope (m) estimated from the data along with the histograms of ms from
+    # the permutations. Show pval calculated from that.
+    betas <- fit$lmo$model$beta
+    plot(gws, betas, ylab=meth, main=site)
+    abline(a=fit$b, b=fit$m, col="blue")
+    pval <- mean(pms < -abs(m)) + mean(pms > abs(m))
+    hist(pms, breaks=30, main=paste(site, meth, "p:", pval))
+    abline(v=m, col="red", lw=3)
+    
+    # Save the linear fit params and calculated beta-diversities
+    mbs <- rbind(mbs, data.frame(site=site, meth=meth, m=m, b=b, pval=pval))
+    mbs_perm <- rbind(mbs_perm, data.frame(site=site, meth=meth, m=pms, b=pbs))
+    betadivs <- rbind(betadivs, data.frame(site=site, meth=meth, GWColl=gws, beta=betas))
+  }
+}
+par(default.par)
+```
+
+Maybe there is a trend towards more beta-diversity in the stool samples? Let's make better plots:
+
+```{r plot-beta-hists, warning=FALSE}
+hbeta <- ggplot(data=mbs_perm, aes(x=m)) + geom_histogram()
+hbeta <- hbeta + geom_vline(data=mbs, aes(xintercept=m), color="red", linetype="dashed")
+hbeta <- hbeta + geom_text(x=0.0058, y=0.3*NPERM, size=3, aes(label=pval), data=mbs)
+hbeta <- hbeta + facet_grid(meth~site)
+hbeta
+```
+
+No. No significant trends at any of the body sites for any of the three distance metrics.
+
+## Plot beta-diversity trend over time with uncertainty band
+
+Use the ensemble slopes/intercepts estimated from the random time-reversals to calculate the "error" at each time-point in the linear fit of the beta-diversity (similar to "stat_smooth"):
+```{r plot-beta-trends}
+meths <- c("bray", "jsd", "wuf")
+preds <- t(mapply(function(m,b) m*gws+b, mbs_perm$m, mbs_perm$b))
+colnames(preds) <- as.character(gws)
+df_perm <- cbind(mbs_perm, preds)
+dfs <- split(df_perm, list(df_perm$site, df_perm$meth))
+betadivs$lo <- c(NA)
+betadivs$hi <- c(NA)
+split_betas <- split(betadivs, list(betadivs$site, betadivs$meth))
+split_mbs <- split(mbs, list(mbs$site, mbs$meth))
+for(site in sites) {
+  for(meth in meths) {
+    key <- paste0(site,".",meth)
+    df <- dfs[[key]]
+    predvar <- apply(df[,as.character(gws)], 2, var)
+    lo <- apply(df[,as.character(gws)], 2, function(x) quantile(x, 0.025))
+    hi <- apply(df[,as.character(gws)], 2, function(x) quantile(x, 0.975))
+    pred <- split_mbs[[key]][[1,"m"]]*gws + split_mbs[[key]][[1,"b"]]
+    split_betas[[key]]$lo <- lo
+    split_betas[[key]]$hi <- hi
+    split_betas[[key]]$pred <- pred
+    split_betas[[key]]$SE <- sqrt(predvar)
+  }
+}
+beta_divs <- unsplit(split_betas, list(betadivs$site, betadivs$meth))
+```
+
+Use the calculated errors to plot the linear fit with an associated confidence band:
+```{r}
+meths <- c("bray", "jsd", "wuf")
+pvs <- list(bray=list(ymin=0, ymax=1, ylab="Beta-diversity (Bray)", xan = 30, yan=1),
+           jsd=list(ymin=0, ymax=1, ylab="Beta-diversity (JSD)", xan = 30, yan=1),
+           wuf=list(ymin=0, ymax=0.5, ylab="Beta-diversity (WUF)", xan = 30, yan=0.48))
+
+b_fits <- list()
+for(site in sites) {
+  df <- divdfs[[site]]
+  for(meth in meths) {
+    dfkey <- paste0(site,".",meth)
+    key <- paste(site,meth)
+    df <- split_betas[[dfkey]]
+    pv <- pvs[[meth]]
+    pval <- mbs[[which(mbs$site==site & mbs$meth==meth), "pval"]]
+
+    # LM modeling/plotting
+    pb <- ggplot(data=df, aes(x=GWColl)) + geom_point(aes(y=beta), size=0.5)
+    pb <- pb + geom_line(aes(y=pred), color="green")
+    pb <- pb + geom_ribbon(aes(ymin=pred-2*SE, ymax=pred+2*SE), alpha=0.2, fill="green")
+    pb <- pb + ylab(pv$ylab) + ylim(pv$ymin, pv$ymax)
+    pb <- pb + xlab("Gestational Time (Weeks)")
+    pb <- pb + annotate("text", x=pv$xan, y=pv$yan, size=ANSIZE, label = paste("p =", substr(as.character(pval),1,PVALLEN)))
+    pb <- pb + ylab(NULL) + xlab(NULL)
+    b_fits[[key]] <- pb
+  }
+}
+library("gridExtra")
+listorder <- paste(sites, rep(meths, each=4))
+b_fits <- b_fits[listorder]
+do.call(grid.arrange,c(b_fits, ncol=4, main=paste("Beta-diversity:", "Bray,", "JSD,", "WUF")))
+```
+
+# Make Publication Figures
+
+Combine and label the generated plots to produce Figure 1:
+```{r plot-main-text, warning=FALSE, message=FALSE}
+ylab1 <- textGrob("Alpha-diversity\n(Shannon)", rot=90, gp=gpar(fontsize=8, col="black"))
+ylab2 <- textGrob("Instability\n(w-Unifrac)", rot=90, gp=gpar(fontsize=8, col="black"))
+ylab3 <- textGrob("Beta-diversity\n(w-Unifrac)", rot=90, gp=gpar(fontsize=8, col="black"))
+xlab1 <- textGrob("          Gestational Weeks", gp=gpar(fontsize=8, col="black"))
+title1 <- textGrob("      Vagina", gp=gpar(fontsize=8, col="black"))
+title2 <- textGrob("       Stool", gp=gpar(fontsize=8, col="black"))
+title3 <- textGrob("      Saliva", gp=gpar(fontsize=8, col="black"))
+title4 <- textGrob("      Tooth/Gum", gp=gpar(fontsize=8, col="black"))
+shanscale <- scale_y_continuous(limits=c(0,5), breaks=c(0,1.5,3,4.5))
+ptheme <- theme(text = element_text(size=7),
+                axis.title.x = element_text(size=8),
+                axis.title.y = element_text(size=8),
+                axis.text.x = element_text(size=7),
+                axis.text.y = element_text(size=7),
+                plot.title = element_text(size=8),
+                plot.margin=unit(c(1,1,1,3),"mm"))
+## MAIN FIGURE
+Fig1 <- arrangeGrob(grob(), title1, title2, title3, title4,
+      ylab1, ggs_alpha[[paste("Vaginal_Swab", "Shannon")]]+ylab(NULL)+xlab(NULL)+ggtitle(NULL)+shanscale + ptheme,
+      ggs_alpha[[paste("Stool", "Shannon")]]+xlab(NULL)+ggtitle(NULL)+shanscale + ptheme,
+      ggs_alpha[[paste("Saliva", "Shannon")]]+xlab(NULL)+ggtitle(NULL)+shanscale + ptheme, 
+      ggs_alpha[[paste("Tooth_Gum", "Shannon")]]+xlab(NULL)+ggtitle(NULL)+shanscale + ptheme,
+      ylab2, ggs_instability[[paste("Vaginal_Swab", "WUF")]]+xlab(NULL) + ptheme,
+      ggs_instability[[paste("Stool", "WUF")]]+xlab(NULL) + ptheme,
+      ggs_instability[[paste("Saliva", "WUF")]]+xlab(NULL) + ptheme, 
+      ggs_instability[[paste("Tooth_Gum", "WUF")]]+xlab(NULL) + ptheme,
+      ylab3, b_fits[[paste("Vaginal_Swab", "wuf")]]+ylab(NULL) + ptheme, 
+      b_fits[[paste("Stool", "wuf")]]+xlab(NULL) + ptheme,
+      b_fits[[paste("Saliva", "wuf")]]+xlab(NULL) + ptheme, 
+      b_fits[[paste("Tooth_Gum", "wuf")]]+xlab(NULL) + ptheme,
+      grob(), xlab1, xlab1, xlab1, xlab1,
+      ncol=5, widths=unit.c(unit(2,"line"),rep(unit(1,"null"), 4)),
+      nrow=5, heights=unit.c(unit(1,"line"), rep(unit(1,"null"), 3), unit(1,"line")))
+Fig1
+# ggsave(Fig1, file = "_PregPNAS_Fig1.pdf", width=17.5, height=9, units=c("cm"))
+```
+
+Combine and label the plots to make the Supplementary Figures:
+```{r plot-supplement, warning=FALSE, message=FALSE}
+ylab1 <- textGrob("Shannon", rot=90, gp=gpar(fontsize=12, col="black"))
+ylab2 <- textGrob("Chao1", rot=90, gp=gpar(fontsize=12, col="black"))
+ylab3 <- textGrob("Simpson", rot=90, gp=gpar(fontsize=12, col="black"))
+xlab1 <- textGrob("Gestational Weeks", gp=gpar(fontsize=12, col="black"))
+title1 <- textGrob("Vagina", gp=gpar(fontsize=12, col="black"))
+title2 <- textGrob("Stool", gp=gpar(fontsize=12, col="black"))
+title3 <- textGrob("Saliva", gp=gpar(fontsize=12, col="black"))
+title4 <- textGrob("Tooth/Gum", gp=gpar(fontsize=12, col="black"))
+shanscale <- scale_y_continuous(limits=c(0,5), breaks=c(0,1.5,3,4.5))
+# SUPPLEMENTARY FIGURE
+grid.arrange(grob(), title1, title2, title3, title4,
+      ylab1, ggs_alpha[[paste("Vaginal_Swab", "Shannon")]]+ylab(NULL)+xlab(NULL)+ggtitle(NULL)+shanscale,
+      ggs_alpha[[paste("Stool", "Shannon")]]+xlab(NULL)+ggtitle(NULL)+shanscale,
+      ggs_alpha[[paste("Saliva", "Shannon")]]+xlab(NULL)+ggtitle(NULL)+shanscale, 
+      ggs_alpha[[paste("Tooth_Gum", "Shannon")]]+xlab(NULL)+ggtitle(NULL)+shanscale,
+      ylab2, ggs_alpha[[paste("Vaginal_Swab", "Chao1")]]+ylab(NULL)+xlab(NULL)+ggtitle(NULL),
+      ggs_alpha[[paste("Stool", "Chao1")]]+xlab(NULL)+ggtitle(NULL),
+      ggs_alpha[[paste("Saliva", "Chao1")]]+xlab(NULL)+ggtitle(NULL), 
+      ggs_alpha[[paste("Tooth_Gum", "Chao1")]]+xlab(NULL)+ggtitle(NULL),
+      ylab3, ggs_alpha[[paste("Vaginal_Swab", "Simpson")]]+ylab(NULL)+xlab(NULL)+ggtitle(NULL),
+      ggs_alpha[[paste("Stool", "Simpson")]]+xlab(NULL)+ggtitle(NULL),
+      ggs_alpha[[paste("Saliva", "Simpson")]]+xlab(NULL)+ggtitle(NULL), 
+      ggs_alpha[[paste("Tooth_Gum", "Simpson")]]+xlab(NULL)+ggtitle(NULL),
+      grob(), xlab1, xlab1, xlab1, xlab1,
+      ncol=5, widths=unit.c(unit(1,"line"),rep(unit(1,"null"), 4)),
+      nrow=5, heights=unit.c(unit(1,"line"), rep(unit(1,"null"), 3), unit(1,"line")))
+
+ylab1 <- textGrob("Bray", rot=90, gp=gpar(fontsize=12, col="black"))
+ylab2 <- textGrob("JSD", rot=90, gp=gpar(fontsize=12, col="black"))
+ylab3 <- textGrob("w-Unifrac", rot=90, gp=gpar(fontsize=12, col="black"))
+# SUPPLEMENTARY FIGURE
+grid.arrange(grob(), title1, title2, title3, title4,
+      ylab1, ggs_instability[[paste("Vaginal_Swab", "Bray")]]+ylab(NULL)+xlab(NULL)+ggtitle(NULL),
+      ggs_instability[[paste("Stool", "Bray")]]+xlab(NULL)+ggtitle(NULL),
+      ggs_instability[[paste("Saliva", "Bray")]]+xlab(NULL)+ggtitle(NULL), 
+      ggs_instability[[paste("Tooth_Gum", "Bray")]]+xlab(NULL)+ggtitle(NULL),
+      ylab2, ggs_instability[[paste("Vaginal_Swab", "JSD")]]+xlab(NULL),
+      ggs_instability[[paste("Stool", "JSD")]]+xlab(NULL),
+      ggs_instability[[paste("Saliva", "JSD")]]+xlab(NULL), 
+      ggs_instability[[paste("Tooth_Gum", "JSD")]]+xlab(NULL),
+      ylab3, ggs_instability[[paste("Vaginal_Swab", "WUF")]]+ylab(NULL)+xlab(NULL), 
+      ggs_instability[[paste("Stool", "WUF")]]+xlab(NULL),
+      ggs_instability[[paste("Saliva", "WUF")]]+xlab(NULL), 
+      ggs_instability[[paste("Tooth_Gum", "WUF")]]+xlab(NULL),
+      grob(), xlab1, xlab1, xlab1, xlab1,
+      ncol=5, widths=unit.c(unit(1,"line"),rep(unit(1,"null"), 4)),
+      nrow=5, heights=unit.c(unit(1,"line"), rep(unit(1,"null"), 3), unit(1,"line")))
+
+ylab1 <- textGrob("Bray", rot=90, gp=gpar(fontsize=12, col="black"))
+ylab2 <- textGrob("JSD", rot=90, gp=gpar(fontsize=12, col="black"))
+ylab3 <- textGrob("w-Unifrac", rot=90, gp=gpar(fontsize=12, col="black"))
+# SUPPLEMENTARY FIGURE
+grid.arrange(grob(), title1, title2, title3, title4,
+      ylab1, b_fits[[paste("Vaginal_Swab", "bray")]]+ylab(NULL)+xlab(NULL)+ggtitle(NULL),
+      b_fits[[paste("Stool", "bray")]]+xlab(NULL)+ggtitle(NULL),
+      b_fits[[paste("Saliva", "bray")]]+xlab(NULL)+ggtitle(NULL), 
+      b_fits[[paste("Tooth_Gum", "bray")]]+xlab(NULL)+ggtitle(NULL),
+      ylab2, b_fits[[paste("Vaginal_Swab", "jsd")]]+xlab(NULL),
+      b_fits[[paste("Stool", "jsd")]]+xlab(NULL),
+      b_fits[[paste("Saliva", "jsd")]]+xlab(NULL), 
+      b_fits[[paste("Tooth_Gum", "jsd")]]+xlab(NULL),
+      ylab3, b_fits[[paste("Vaginal_Swab", "wuf")]]+ylab(NULL), 
+      b_fits[[paste("Stool", "wuf")]]+xlab(NULL),
+      b_fits[[paste("Saliva", "wuf")]]+xlab(NULL), 
+      b_fits[[paste("Tooth_Gum", "wuf")]]+xlab(NULL),
+      grob(), xlab1, xlab1, xlab1, xlab1,
+      ncol=5, widths=unit.c(unit(1,"line"),rep(unit(1,"null"), 4)),
+      nrow=5, heights=unit.c(unit(1,"line"), rep(unit(1,"null"), 3), unit(1,"line")))
+```
+
+## Ordination of Communities During Pregnancy
+
+Another way to look for systematic trends during pregnancy is to ordinate, and indicate time via color, allowing the eye to pick out (or not) trends.
+
+Calculate ordination:
+```{r ordinate, message=FALSE}
+ords <- list()
+for(site in sites) {
+  ps <- PSPreg[[site]]
+  ords[[site]] <- ordinate(ps, "NMDS", "bray")
+}
+``` 
+
+Plot supplementary figure of ordinations for the different body sites:
+```{r plot-ordinations}
+require("RColorBrewer")
+timepal <- colorRampPalette(brewer.pal(9,"RdBu"))(41)
+
+contours <- list()
+for(site in sites) {
+  ps <- PSPreg[[site]]
+  pord <- plot_ordination(ps, ords[[site]], type = "samples")
+#  print(pord + geom_point(aes(color=GWColl), size = 3, alpha=0.5) + ggtitle(paste(site, "NMDS", "bray")))
+  data <- pord$data
+  data$Time <- c(NA)
+  data$Time[data$GWColl %in% seq(14,21)] <- "Early"
+  data$Time[data$GWColl %in% seq(28,35)] <- "Late"
+  cont <- ggplot(data=data, aes(x=NMDS1, y=NMDS2))
+  cont <- cont + geom_point(size=0.5) + geom_density2d(data=data[!is.na(data$Time),], aes(color=Time)) + xlim(-2,2) + ylim(-2,2)
+  contours[[site]] <- cont + ggtitle(site)
+}
+# SUPPLEMENTARY FIGURE
+do.call(grid.arrange, c(contours, ncol=2))
+```
+
+There is no trend evident in this plot, again supporting the idea that there is little systematic change in these communities over the course of pregnancy.

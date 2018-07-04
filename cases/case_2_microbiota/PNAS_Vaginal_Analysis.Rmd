@@ -1,0 +1,655 @@
+---
+title: 'CST Analysis: Vaginal Samples'
+author: "BJC"
+date: "April 22, 2015"
+output: html_document
+---
+
+Cluster vaginal community samples into CSTs
+========================================================
+Herein we consider whether a clustering approach on vaginal community samples can provide a useful projection of our data onto a discrete set of "CSTs" (community state types), use that clustering to explore the dynamics of the vaginal community, and test for associations between CSTs and individual taxa within those CSTs and preterm birth outcomes.
+
+Initialize:
+```{r init, message=FALSE}
+library("phyloseq"); packageVersion("phyloseq")
+library("ggplot2"); packageVersion("ggplot2")
+library("cluster"); packageVersion("cluster")
+library("igraph"); packageVersion("igraph")
+library("markovchain"); packageVersion("markovchain")
+library("RColorBrewer")
+library("gridExtra")
+
+set.seed(100)
+default.par <- par(no.readonly = TRUE)
+options(stringsAsFactors = FALSE)
+theme_set(theme_bw())
+# EXCLUDEMARGINAL is a flag to exclude marginally preterm births (=37 weeks) in the later analysis
+EXCLUDEMARGINAL = TRUE
+```
+
+Load data:
+```{r load-data, message=FALSE}
+setwd("~/Pregnancy")
+otu_file <- "PregnancyClosed15.RData"
+load(otu_file)
+```
+
+Transform the data (proportions):
+```{r transform-data}
+site <- "Vaginal_Swab"
+ps <- PSPreg[[site]]
+tt <- data.frame(tax_table(ps))
+ps <- transform_sample_counts(ps, function(OTU) OTU/sum(OTU))
+```
+We are not doing differential abundance analysis here, so the proportion transformation is used for exploratory analyses only.
+
+# Cluster into CSTs
+
+The vaginal community is dominated by closely related, but functionally distinct, Lactobacillus species. Therefore it is better to use a non-phylogenetically aware distance measure so as to be able to separate these species. Start with an MDS (or PCoA) ordination:
+```{r MDS, warning=FALSE}
+braydist <- phyloseq::distance(ps, method="bray")
+ord = ordinate(ps, method = "MDS", distance = braydist)
+plot_scree(ord) + xlim(as.character(seq(1,12))) + ggtitle("MDS-bray ordination eigenvalues")
+evs <- ord$value$Eigenvalues
+print(evs[1:20])
+print(tail(evs))
+```
+
+## Denoise distance matrix
+
+We would like to clean some of the noise from the data by restricting this to the truly significant dimensions. The top 5 eigenvalues are clearly very significant, but let's keep all the positive eigenvalues that clearly exceed the magnitude of the smallest negative eigenvalues:
+```{r PCoA-cutoff2, warning=FALSE}
+h_sub5 <- hist(evs[6:length(evs)], 100)
+plot(h_sub5$mids, h_sub5$count, log="y", type='h', lwd=10, lend=2)
+```
+
+Looks like eigenvalues 6 and 7 still stand out, so we'll go with 7 MDS dimensions.
+
+## Determine number of clusters
+We will use the gap statistic to indicate the number of clusters in this data:
+```{r gap-stat}
+NDIM <- 7
+x <- ord$vectors[,1:NDIM]  # rows=sample, cols=MDS axes, entries = value
+pamPCoA = function(x, k) {
+    list(cluster = pam(x[,1:2], k, cluster.only = TRUE))
+}
+gs = clusGap(x, FUN = pamPCoA, K.max = 12, B = 50)
+plot_clusgap(gs) + scale_x_continuous(breaks=c(seq(0, 12, 2)))
+```
+
+The gap statistic strongly suggests at least three clusters, but makes another big jump at K=5 before the slope gets a lot smaller. So, K=5 it is.
+
+## Cluster into CSTs
+
+Perform PAM 5-fold clusters:
+```{r pam-k5}
+K <- 5
+x <- ord$vectors[,1:NDIM]
+clust <- as.factor(pam(x, k=K, cluster.only=T))
+# SWAPPING THE ASSIGNMENT OF 2 AND 3 TO MATCH RAVEL CST ENUMERATION
+clust[clust==2] <- NA
+clust[clust==3] <- 2
+clust[is.na(clust)] <- 3
+sample_data(ps)$CST <- clust
+CSTs <- as.character(seq(K))
+```
+
+## Evaluate clustering
+
+Inspect the results in MDS and NMDS ordinations:
+```{r see-pam-k5, message=FALSE}
+CSTColors <- brewer.pal(6,"Paired")[c(1,3,2,5,4,6)] # Length 6 for consistency with pre-revision CST+ coloration
+names(CSTColors) <- CSTs
+CSTColorScale <- scale_colour_manual(name = "CST", values = CSTColors[1:5])
+CSTFillScale <- scale_fill_manual(name = "CST", values = CSTColors[1:5])
+grid.arrange(plot_ordination(ps, ord, color="CST") + CSTColorScale,
+             plot_ordination(ps, ord, axes=c(3,4), color="CST") + CSTColorScale, main="Ordination by Cluster")
+plot_ordination(ps, ordinate(ps, method="NMDS", distance=braydist), color="CST") + CSTColorScale + ggtitle("NMDS -- bray -- By Cluster")
+```
+
+The ordinations offer support for these being legitimate clusters, even if they are not perfect and some samples look like they might be mixtures of two clusters. Let's take a look at the heatmaps of each cluster for additional perspective:
+```{r clust-diverse}
+taxa.order <- names(sort(taxa_sums(ps)))
+for(CST in CSTs) {
+  pshm <- prune_taxa(names(sort(taxa_sums(ps), T))[1:25], ps)
+  pshm <- prune_samples(sample_data(pshm)$CST == CST, pshm)
+  print(plot_heatmap(pshm, taxa.label="Species", taxa.order=taxa.order) + ggtitle(paste("CST:", CST)))
+}
+```
+
+These heatmaps show that the clusters have a clear interpretability that further supports the validity of clustering in this context. CSTs 1,2,3 and 5 are dominated by different species of Lactobacillus. CST4 is much more diverse.
+
+## Plot heatmap colored by CST
+
+Plot a heat map of the relative abundances of the top taxa for all the vaginal samples, with color bars indicating the CST and the preterm Outcome associated with each sample.
+
+First define some functions to make the combined heat map that deal with the various layout issues:
+```{r fig2funcs}
+make_hcb <- function(data, var, name = NULL, fillScale = NULL, ...) {
+  hcb <- ggplot(data=data, aes_string(x="index", y=1, fill=var)) + 
+          geom_raster() +
+          scale_y_continuous(expand=c(0,0), breaks=1, labels=name) + 
+          scale_x_continuous(expand=c(0,0)) +
+          xlab(NULL) + ylab(NULL) +
+          theme(axis.title=element_blank(), axis.ticks=element_blank()) +
+          theme(axis.text.x=element_blank()) +
+          theme(axis.text.y=element_text(size=8, face="bold")) +
+          theme(plot.margin=unit(c(0,0,0,0),"lines"), 
+                axis.ticks.margin = unit(0,"null"), ...) +
+          guides(fill=F)
+  if(!is.null(fillScale)) hcb <- hcb + fillScale
+  return(hcb)
+}
+
+plot_heatmap.2 <- function(ps, sample.label=NULL, taxa.label=NULL, ...) {
+  hm <- plot_heatmap(ps, taxa.label="Species", sample.order=sample.order, taxa.order = taxa.order)
+  hm <- hm + theme(axis.text.x=element_blank(), axis.ticks.x=element_blank())
+  low = "#000033"; high = "#66CCFF"; trans = scales::log_trans(4); na.value = "black" # From plot_heatmap defaults
+  new_gradient <- scale_fill_gradient(low = low, high = high, trans = trans, na.value = na.value, breaks = c(0.001, 0.01, 0.1, 1), name="Relative\nabundance")
+  hm <- hm + theme(plot.margin=unit(c(0,0.5,0.5,0.5),"lines"))
+  hm <- hm + new_gradient
+  hm <- hm + geom_raster() #
+  hm <- hm + ylab("Taxa")
+  hm$layers <- hm$layers[2] #
+  return(hm)
+}
+
+mush <- function(hmap, hcbs) {
+  cbgs <- lapply(hcbs, ggplotGrob)
+  hmg <- ggplotGrob(hmap)
+  # Make sure both plots have the same width in our final output
+  cbWidths <- lapply(cbgs, function(x) x$widths[1:4])
+  maxWidth <- do.call(unit.pmax, cbWidths)
+  maxWidth <- unit.pmax(hmg$widths[1:4], maxWidth)
+  
+  # For visibility, set to the maximum width
+  hmg$widths[1:4] <- as.list(maxWidth)
+  for(i in seq_along(cbgs)) {
+    cbgs[[i]]$widths[1:5] <- as.list(unit.c(maxWidth, hmg$widths[5]+hmg$widths[6]))
+  }
+  heights <- unit.c(unit(rep(1,length(cbgs)), "lines"), unit(1, "null"))
+  rval <- do.call(arrangeGrob, args = c(cbgs, list(hmg), ncol=1, heights=list(heights)))
+  return(rval)
+}
+```
+
+Now plot the manuscript Figure 2:
+```{r fig2, warning=FALSE, message=FALSE}
+top25 <- names(sort(taxa_sums(ps), decreasing=T))[1:25]
+pshm <- prune_taxa(top25,ps)
+taxa.order <- names(sort(taxa_sums(pshm)))
+
+#### FIX THE BAD TAX NAME FOR THIS OTU
+tax_table(pshm)["259604","Species"] <- tax_table(pshm)["259604", "Order"]
+sample.order <- rownames(sample_data(pshm)[order(get_variable(pshm, "CST"))])
+hm <- plot_heatmap.2(pshm, taxa.label="Species", sample.order=sample.order, taxa.order=taxa.order)
+hm <- hm + theme(axis.title.x = element_text(size=10),
+                axis.title.y = element_text(size=10),
+                axis.text.x = element_text(size=7),
+                axis.text.y = element_text(size=7),
+                plot.title = element_text(size=8),
+                legend.text = element_text(size=7),
+                legend.title = element_text(size=8),
+#                legend.margin = unit(c(0.1,0.1,0.1,0.1),"mm"),
+#                legend.key.height = unit(1, "in"),
+                legend.key.width = unit(0.15, "in"),
+                plot.margin=unit(c(0,0,0,0),"mm"))
+
+### CHANGING SPECIES TO TAXA ON YLABEL
+labvec <- as(tax_table(pshm)[, "Species"], "character")
+names(labvec) <- taxa_names(pshm)
+labvec <- labvec[taxa.order]
+labvec[is.na(labvec)] <- ""
+labvec[which(labvec == "Lactobacillus reuteri-vaginalis")] <- "L. reuteri-vaginalis"
+hm <- hm + scale_y_discrete("Taxa", labels = labvec)
+hm <- hm + theme(axis.title = element_text(size=10))
+
+hcbdf <- data.frame(sample_data(pshm))[sample.order,]
+hcbdf$index <- seq(1,nsamples(pshm))
+hcb <- make_hcb(hcbdf, "CST", name="CST", fillScale = CSTFillScale)
+hcb <- hcb + annotate("text", x=tapply(hcbdf$index, hcbdf[,"CST",drop=T], mean), y=1, label=levels(hcbdf[,"CST",drop=T]), size=2)
+
+hcbPreterm <- make_hcb(hcbdf, "Outcome", name="Very Pre Term",
+                fillScale = scale_fill_manual(values=c("Term"="grey60", "Preterm"="maroon", "VeryPreterm"="magenta2", "Marginal"="white")))
+#hcbPreterm <- hcbPreterm + theme(axis.text.y = element_text(size=8, face="bold", color="magenta2"))
+#hcbPreterm <- hcbPreterm + theme(axis.text.y = element_text(size=8, face="bold", color="maroon"))
+hcbPreterm <- hcbPreterm + theme(axis.text.y = element_text(size=8, face="bold", color="grey60"))
+
+Fig2 <- mush(hm, list(hcbPreterm, hcb))
+print(Fig2)
+# MUST MANUALLY SAVE: (4.49in x 3.2in)
+```
+
+Save identified CSTs in the PSPreg object:
+```{r}
+sample_data(PSPreg[["Vaginal_Swab"]])$CST <- clust
+```
+
+# Analyzing CST dynamics
+
+The dynamics of the vaginal CSTs, in particular the transition rates between them, are of interest. We will take each pair of sequential samples separated by one week (4-10 days) and calculate the MLE estimate of the transition matrix between CSTs from the list of transitions observed, which is MLE(t_ij) = n_ij/n_i. This lacks error bars, and is not using all the data as it drops the information contained in transitions interrupted by missing data, but we have enough sequential data samples for this to be a reasonable estimate:
+
+## Estimating transition rates
+
+Define function to reduce the sample_data down to those samples with a previous samples within a specified window of time:
+```{r MLE-trans}
+samdat.prune_prev <- function(samdat) {
+  GAP_MIN <- 4
+  GAP_MAX <- 10
+  samdf <- data.frame(samdat)
+  subjects <- unique(samdf$SubjectID)
+  csub <- split(samdf, samdf$SubjectID)
+  for(sub in subjects) {
+    cc <- csub[[sub]]
+    cc <- cc[order(cc$GDColl),]
+    cc$PrevID <- c(NA, cc$SampleID[-nrow(cc)])
+    del <- cc$GDColl - c(-999, cc$GDColl[-nrow(cc)])
+    keep <- del>=GAP_MIN & del<=GAP_MAX
+    if(sum(keep) == 0) {
+      csub[[sub]] <- NULL
+    } else {
+      cc <- cc[keep,]
+      csub[[sub]] <- cc
+    }
+  }
+  return(do.call(rbind, csub))
+}
+```
+
+Calculate the MLE estimate of the transition rates from the set of consecutive samples:
+```{r MLE-calc-trans}
+ps <- PSPreg[["Vaginal_Swab"]]
+ps <- transform_sample_counts(ps, function(OTU) OTU/sum(OTU))
+
+samdf <- data.frame(sample_data(ps))
+CSTs <- levels(samdf$CST)
+nstates <- nlevels(samdf$CST)
+
+# Reduce the sample_data down to those samples with previous samples within a 4-10 day window
+samdf_prev <- samdat.prune_prev(samdf)
+rownames(samdf_prev) <- samdf_prev$SampleID
+
+# Estimate the 1-week transition rates, print out some related numbers
+samdf_prev$PrevCST <- data.frame(sample_data(ps))[samdf_prev$PrevID,"CST"]
+samdf_prev$CurCST <- samdf_prev$CST
+ttab <- table(samdf_prev$PrevCST, samdf_prev$CurCST) # prevstate=row, curstate=col
+trans <- matrix(ttab, nrow=nstates)
+trans <- trans/rowSums(trans)  # Normalize row sums to 1
+CSTtrans <- trans
+colnames(CSTtrans) <- CSTs
+rownames(CSTtrans) <- CSTs
+t_persist <- -1/log(diag(CSTtrans))
+CSTtrans # Paper
+t_persist # Paper
+summary(samdf_prev$GDColl-samdf[samdf_prev$PrevID,"GDColl"]) # Paper
+```
+
+## Visualize transition between CSTs
+
+We'll make an igraph plot of the transitions rates between CSTs with an assist from the markovchain package. First we load the transition rates and state names into a markovchain object and have it give us an igraph object:
+```{r plot-MC-plus}
+# Make Markov chain object
+mcPreg <- new("markovchain", states=CSTs,
+              transitionMatrix = trans, name="PregCST")
+mcPreg
+
+# Set up igraph of the markov chain
+netMC <- markovchain:::.getNet(mcPreg, round = TRUE)
+```
+
+Now define a number of plotting parameters, and assign node colors based on the association of that CST and preterm outcome:
+```{r}
+wts <- E(netMC)$weight/100
+
+edgel <- get.edgelist(netMC)
+elcat <- paste(edgel[,1], edgel[,2])
+elrev <- paste(edgel[,2], edgel[,1])
+edge.curved <- sapply(elcat, function(x) x %in% elrev)
+
+samdf_def <- data.frame(sample_data(ps))
+samdf_def <- samdf_def[samdf$Preterm | samdf$Term,] # Only those definitely assigned, i.e. not marginal
+premat <- table(samdf_def$CST, samdf_def$Preterm)
+rownames(premat) <- markovchain::states(mcPreg)
+colnames(premat) <- c("Term", "Preterm")
+premat
+premat <- premat/rowSums(premat)
+vert.CSTclrs <- CSTColors
+```
+
+Now create the manuscript Figure 3b showing the transition network between CSTs:
+```{r fig3b}
+default.par <- par(no.readonly = TRUE)
+# Define color scale
+# Plotting function for markov chain
+plotMC <- function(object, ...) {
+    netMC <- markovchain:::.getNet(object, round = TRUE)
+    plot.igraph(x = netMC, ...)  
+}
+# Color bar for the markov chain visualization, gradient in strength of preterm association
+color.bar <- function(lut, min, max=-min, nticks=11, ticks=seq(min, max, len=nticks), title=NULL) {
+    scale = (length(lut)-1)/(max-min)
+
+#    dev.new(width=1.75, height=5)
+    
+    cur.par <- par(no.readonly=T)
+    par(mar=c(0,4,1,4)+0.1, oma=c(0,0,0,0)+0.1)
+    par(ps = 10, cex = 0.8)
+    par(tcl=-0.2, cex.axis=0.8, cex.lab = 0.8)
+    plot(c(min,max), c(0,10), type='n', bty='n', xaxt='n', xlab='', yaxt='n', ylab='', main=title)
+    axis(1, c(0, 0.5, 1))
+    for (i in 1:(length(lut)-1)) {
+      x = (i-1)/scale + min
+      rect(x,0,x+1/scale,10, col=lut[i], border=NA)
+    }
+}
+
+
+pal <- colorRampPalette(c("grey50", "maroon", "magenta2"))(101)
+vert.clrs <- sapply(states(mcPreg), function(x) pal[1+round(100*premat[x,"Preterm"])])
+vert.sz <- 4 + 2*sapply(states(mcPreg), 
+              function(x) nrow(unique(sample_data(ps)[sample_data(ps)$CST==x,"SubjectID"])))
+vert.sz <- vert.sz * 0.85
+vert.font.clrs <- c("white", "white", "white", "white", "white")
+# E(netMC) to see edge list, have to define loop angles individually by the # in edge list, not vertex
+edge.loop.angle = c(0, 0, 0, 0, 3.14, 3.14, 0, 0, 0, 0, 3.14, 0, 0, 0, 0, 0)-0.45
+pdf("PregPNAS_Fig3b.pdf", width=3.2, height=3.2,useDingbats = F)
+layout <- matrix(c(0.6,0.95, 0.43,1, 0.3,0.66, 0.55,0.3, 0.75,0.65), nrow=5, ncol=2, byrow=T)
+
+# Colored by association with preterm birth
+layout(matrix(c(1,1,2,2), 2, 2, byrow = TRUE), heights=c(1,10))
+color.bar(pal, min=0, max=1, nticks=6, title="Fraction preterm")
+par(mar=c(0,1,1,1)+0.1)
+edge.arrow.size=0.8
+edge.arrow.width=1.4
+edge.width = (16*wts + 0.5)
+edge.labels <- as.character(E(netMC)$weight/100)
+edge.labels[edge.labels<0.4] <- NA  # labels only for self-loops
+edge.width[edge.width>0.5] <- 0.3*edge.width[edge.width>0.5]  # smaller for self-loops
+# FIGURE 3B
+
+plotMC(mcPreg, edge.arrow.size=edge.arrow.size, edge.arrow.width = edge.arrow.width,
+     edge.label = edge.labels, edge.label.font=2, edge.label.cex=1.3, edge.label.color="black",
+       # FIX EDGE LABELS FOR PUBLICATION IN POST-PROCESSING
+       edge.width=edge.width, edge.curved=edge.curved, 
+       vertex.color=vert.clrs, vertex.size=1.1*(vert.sz),
+       vertex.label.font = 2, vertex.label.cex = 2,
+       vertex.label.color = vert.font.clrs, vertex.frame.color = NA, 
+       layout=layout, edge.loop.angle = edge.loop.angle)
+#dev.off()
+par(default.par)
+```
+
+```{r}
+plotMC(mcPreg, edge.arrow.size=edge.arrow.size, edge.arrow.width = edge.arrow.width,
+#       edge.label = edge.labels, edge.label.font=2, edge.label.cex=1.3, edge.label.color="black",
+       # FIX EDGE LABELS FOR PUBLICATION IN POST-PROCESSING
+       edge.width=edge.width, edge.curved=edge.curved, 
+       vertex.color=vert.clrs, vertex.size=(vert.sz),
+       vertex.label.font = 2.5, vertex.label.cex = 2,
+       vertex.label.color = vert.font.clrs, vertex.frame.color = NA, 
+       layout=layout, edge.loop.angle = edge.loop.angle)
+#dev.off()
+
+
+
+```
+
+Color indicates the fraction of those CSTs samples from preterm births (excluding marginal subjects). Size indicates the number of subjects in which that CST was observed. The much, much higher association of CST 4 with preterm birth suggests that transitions into that state might be an important warning sign to watch out for.
+
+## Plot Sampling Time Course
+
+It is also useful to look at the sampling trajectory of our subjects colored by the CST. First define a function for plotting the sampling trajectory:
+```{r plot-sampling-function}
+# Function to plot a sampling trajectory
+plot_sampling <- function(df, showDel=T, delShape = 41, ...) {
+  if(class(df)=="phyloseq") df <- data.frame(sample_data(df))
+
+  # Cut down to the df needed for plotting
+  df$GDDel <- round(df$GDDel)
+  unqs <- unique(df[,c("SubjectNice", "GDDel")])
+  unqs <- unqs[order(unqs$GDDel, na.last=T),]
+  ordered_subs <- unqs$SubjectNice
+
+  # Annoying re-ordering because @sample_data doesn't save ordered factors
+  df$SubjectOrdered <- ordered(df$SubjectNice, levels = ordered_subs)
+  
+  # Separate Preterm/Marginal/Term with a bit of whitespace
+  df$Y <- as.numeric(df$SubjectOrdered) + 2*df$Marginal + 4*df$Term
+  
+  p <- ggplot(df, aes(x = GDColl/7, y = Y + 0.1*as.numeric(BodySite)))
+  if(showDel) {
+    p <- p + geom_point(shape=delShape, size=2, color="black", 
+                    aes(x = GDDel/7 + 0.25, y = Y + 0.15))
+  }
+  p + geom_point(...) + 
+      ylab("Subject") + xlab("Gestational Weeks") +
+      scale_y_continuous(breaks=sort(unique(df$Y)) + 0.2, labels=levels(df$SubjectOrdered))
+}
+```
+
+Plot the sampling time course for the vaginal community colored by the CST (Figure 3a in the manuscript):
+```{r plot-fig3a, warning=FALSE}
+psam <- plot_sampling(samdf, size=2) + aes(color=CST) + CSTColorScale + xlim(6, 44)
+psam <- psam + theme(title=element_text(size=rel(1.5))) + guides(size=F)
+psam <- psam + ylab("Subject")
+
+Fig3a <-  psam + theme_bw() +
+                theme(axis.title.x = element_text(size=11),
+                axis.text.x = element_text(size=11),
+                axis.title.y = element_text(size=11),
+                axis.text.y = element_text(size=11),
+                axis.ticks.y = element_line(size=0.25),
+                plot.title = element_text(size=11),
+                legend.text = element_text(size=8),
+                legend.title = element_text(size=10),
+                legend.key.height = unit(0.15, "in"),
+                legend.key.width = unit(0.15, "in"),
+                legend.background = element_blank(),
+                legend.margin = unit(0,"mm"),
+                plot.margin= unit(c(0.5,0,0,0),"mm"),
+                strip.text = element_text(size=11))
+
+print(Fig3a)
+ggsave(Fig3a, file = "Fig3a.pdf", width=8.7, height=8, units=c("cm"), useDingbats = F)
+```
+
+This shows pretty clearly that CST4 samples are more prevalent in the shorter, preterm pregnancies than they are in the term pregnancies. We will test that association more formally, but first make the Supplementary figure showing full sampling (including post-pregnancy) at each body site:
+```{r plot-sfig-sampling}
+# Color by body site
+siteColors <- brewer.pal(length(sites),"Set1")
+names(siteColors) <- sites
+
+samps <- lapply(sites, function(site) plot_sampling(data.frame(sample_data(PSbs[[site]])), size=1.2, color=siteColors[[site]]) + xlab("Weeks after conception") + guides(color=F) + ggtitle(site) + theme(axis.text.y = element_text(size=5)))
+do.call(grid.arrange, samps)
+# Save as PDF
+```
+
+# Test for associations between pregnancy outcome and CST
+
+## Correlation between CST4 prevalence and gestational time at delivery
+
+First we evaluate whether there is a relationship between the prevalence of CST4 during pregnancy and the length of gestation. We restrict this analysis to those subjects with at least 10 samples so that the independent variable (the proportion of CST4 samples) is not unduly influenced by randomness associated with a very small number of samplings. The manuscript Figure 4a showing this relationship is plotted here:
+```{r time-vs-frac4, warning=FALSE}
+# Rarefy down to those subjects with at least 10 samples
+keep <- (table(sample_data(ps)$SubjectID) >= 10)
+keep <- names(keep[keep])
+asamdf <- data.frame(sample_data(ps))
+asamdf <- asamdf[asamdf$SubjectID %in% keep,]
+asamdf <- droplevels(asamdf)
+
+# Calculate the fraction of CST4 samples from each of these subjects
+subdivtab <- table(asamdf$SubjectID, CST4=(asamdf$CST=="4"))
+fracdiv <- (subdivtab/rowSums(subdivtab))[,2]
+subdf <- asamdf[!duplicated(asamdf$SubjectID),]
+rownames(subdf) <- subdf$SubjectID
+subs <- rownames(subdf)
+#identical(subs,names(fracdiv))
+subdf$FracDiv <- fracdiv
+
+# Plot Length of Delivery vs. the Fraction of CST4 samples
+OFillScale <- scale_fill_manual("", values = c("Term"="grey50", "Preterm"="maroon", "VeryPreterm"="magenta2", "Marginal"="white"))
+OColorScaleBorder <- scale_color_manual("", values = c("Term"="white", "Preterm"="white", "VeryPreterm"="white", "Marginal"="black"))
+subdf$Outcome <- ordered(subdf$Outcome, levels=c("Term", "Marginal", "Preterm", "VeryPreterm"))
+gsub <- ggplot(data=subdf, aes(x=FracDiv, y=GDDel/7))
+gsub <- gsub + geom_point(aes(color=Outcome, fill=Outcome), pch=21, size=2) + OFillScale + OColorScaleBorder
+gsub <- gsub + stat_smooth(method="lm", color="black", linetype="dashed", alpha=0)
+gsub <- gsub + ylab("Weeks at Delivery") + xlab("Fraction CST4 Vaginal Samples")
+gsub
+
+# Test the association
+cor.test(subdf$FracDiv, subdf$GDDel, method="pearson")
+cor.test(subdf$FracDiv, subdf$GDDel, method="spearman")
+# Correct for white/non-white then test
+whitedf <- subdf[subdf$Race=="White",]
+nonwhitedf <- subdf[subdf$Race!="White",]
+whitedf$FracDivCor <- whitedf$FracDiv-mean(whitedf$FracDiv)
+nonwhitedf$FracDivCor <- nonwhitedf$FracDiv-mean(nonwhitedf$FracDiv)
+regdf <- rbind(whitedf, nonwhitedf)
+cor.test(regdf$FracDivCor, regdf$GDDel, method="pearson")
+cor.test(regdf$FracDivCor, regdf$GDDel, method="spearman")
+```
+There is a significant negative association with the prevalance of CST4 and gestational time at delivery.
+
+## Show the association of CST4 with preterm outcome at different periods during pregnancy
+
+Here a visual table is made of the assocation with preterm outcome as a function of gestational time at sampling. Because we are considering preterm-ness as a categorical variable here, we exclude all marginal subjects from this analysis:
+```{r prune-complete, warning=FALSE}
+# Organize data frame, restrict to <= 35 gestational weeks and exclude marginal deliveries
+asamdf <- data.frame(sample_data(ps))
+asamdf <- droplevels(asamdf)
+truncdf <- asamdf[asamdf$GWColl <= 35,]
+if(EXCLUDEMARGINAL) truncdf <- truncdf[!truncdf$Marginal,]
+
+# Make table of the fraction of samples taken in each CST/time-period from preterm subjects
+gsam <- ggplot(data=truncdf, aes(x=GWColl, y=Preterm, color=CST))
+gsam <- gsam + geom_point(position = position_jitter(w = 0.15, h = 0.07))
+gsam + CSTColorScale
+cutlabs <- c("1-10", "11-15", "16-20", "21-25", "26-30", "31-35")
+truncdf$GWBin <- cut(truncdf$GWColl, c(0,10,15,20,25,30,35), labels=cutlabs)
+nbins <- length(levels(truncdf$GWBin))
+tab <- tapply(truncdf$Preterm, list(truncdf$CST, truncdf$GWBin), mean)
+
+# Plot a visual representation of that table
+bindf <- data.frame(GWBin=levels(truncdf$GWBin), FracPreterm=c(tab[1,], tab[2,], tab[3,], tab[4,], tab[5,]),
+                    CST=rep(levels(truncdf$CST), each=nbins))
+bindf$GWBin <- ordered(bindf$GWBin, cutlabs)
+bindf$CST <- ordered(bindf$CST, CSTs)
+gbin <- ggplot(data=bindf, aes(x=as.numeric(GWBin)+0.02*as.numeric(CST)-0.05, y=FracPreterm, color=CST))
+  # Small offsets for each CST to make everything visible
+gbin <- gbin + geom_point(size=2) + CSTColorScale
+gbin <- gbin + xlab("Weeks at Sampling") + ylab("Preterm Association")
+gbin <- gbin + scale_x_continuous(breaks=seq(1,6), labels=cutlabs)
+gbin
+table(sample_data(ps)$CST, sample_data(ps)$Outcome)
+```
+CST4 specimens are associated with preterm outcomes even when obtained relatively early in pregnancy.
+
+## Plot Figure 4
+
+Combine the subpanels plotted above and format into the publication figure:
+```{r fig4, warning=FALSE}
+gsub4 <- gsub + theme_bw()
+gsub4 <- gsub + theme(axis.title.x = element_text(size=7),
+                axis.title.y = element_text(size=7),
+                axis.text.x = element_text(size=6),
+                axis.text.y = element_text(size=7),
+                plot.title = element_text(size=8),
+                legend.text = element_text(size=6),
+                legend.title = element_blank(),
+                legend.key.height = unit(0.1, "in"),
+                legend.key.width = unit(0.1, "in"),
+                legend.position = c(0.25, 0.34),
+                legend.background = element_blank(),
+                legend.margin = unit(0,"mm"),
+                plot.margin= unit(c(0.5,5,0,0.5),"mm"),
+                strip.text = element_text(size=8))
+
+gbin4 <- gbin + theme_bw()
+gbin4 <- gbin4 + theme(axis.title.x = element_text(size=7),
+                axis.title.y = element_text(size=7),
+                axis.text.x = element_text(size=6),
+                axis.text.y = element_text(size=6),
+                plot.title = element_text(size=8),
+                legend.text = element_text(size=6),
+                legend.title = element_text(size=6),
+                legend.key.height = unit(0.15, "in"),
+                legend.key.width = unit(0.15, "in"),
+                legend.margin = unit(0,"mm"),
+                legend.background = element_blank(),
+                plot.margin=unit(c(0.5,-3.5,0,0),"mm"),
+                strip.text = element_text(size=8))
+
+Fig4 <- arrangeGrob(gsub4, gbin4, nrow=1,
+                    widths=unit.c(unit(5.1,"cm"),unit(6.3,"cm")))
+print(Fig4)
+#ggsave(Fig4, file = "PregPNASFigs/Fig4.pdf", width=11.4, height=4.5, units=c("cm"), useDingbats = F)
+```
+
+# Further Structure in the Diverse CST
+
+CST4 has significantly more structure, not being dominated by a single Lactobacillus species, than the other CSTs. Given its association with preterm birth, we are interested if there are further associations within this CST. We will use DESeq2 to test for taxa-level assocations:
+```{r message=FALSE}
+library("DESeq2"); packageVersion("DESeq2")
+```
+
+Make a function to run DESeq2 and return a pruned version of its output:
+```{r DEseq-func}
+getDEsigs <- function(ps, design, FDR = 0.1, fitType="local") {
+  require(DESeq2)
+  pDE <- phyloseq_to_deseq2(ps, design = design)
+  pDE <- DESeq(pDE, fitType=fitType)
+  res <- results(pDE)
+  res <- res[order(res$padj, na.last = T), ]
+  res$prank <- seq(1,nrow(res))
+  res$OTU <- rownames(res)
+  res <- as.data.frame(res)
+  res <- res[!is.na(res$padj),]
+  res <- res[res$padj < FDR,]
+  res
+}
+```
+
+## Independent samples
+
+Use DESeq2 to test for assocations between the relative abundance of taxa within CST4 and preterm birth. First consider all samples as being independent (ignore the subject effect):
+```{r}
+# MUST GO BACK TO RAW COUNTS HERE
+ps <- PSPreg[["Vaginal_Swab"]]
+keep <- genefilter_sample(ps, filterfun_sample(function(x) x > 0), A = 0.25 * nsamples(ps))
+ps <- prune_taxa(keep, ps)
+if(EXCLUDEMARGINAL) ps <- prune_samples(sample_data(ps)$Outcome != "Marginal", ps)
+ps <- prune_samples(sample_data(ps)$CST == "4", ps)
+
+ps_step <- ps # Stepped to regularize for DESeq
+otu_table(ps_step) <- otu_table(ps_step)+1
+
+de_indy <- getDEsigs(ps_step, ~Preterm, FDR=0.1)
+de_indy$species <- tax_table(ps_step)[rownames(de_indy),"Species"]
+de_indy[de_indy$log2FoldChange>0,]
+```
+
+Ureaplasma is a long way out in first, and Gardnerella is second. Both have positive log2Fold, and high baseMeans and are way out in front of any other taxa with positive associations.
+
+### Merged by subject
+
+Longitudinal samples from within the same subjects are not statistically indpendent as was assumed in the previous DESeq test. However, it is difficult to fully model the dependence between samples, especially given the heterogenous sampling of our subjects. So, we'll take an extreme approach, and average all the CST4 samples from each subject into one merged-sample per-subject:
+```{r warning=FALSE, message=FALSE}
+psm <- merge_samples(ps, "SubjectID")  # OTU_COUNTS ARE SUMMED
+sample_data(psm)$SubjectID <- rownames(sample_data(psm))
+# Make mean OTU-counts
+omat <- as(otu_table(psm), "matrix")
+nsam <- table(sample_data(ps)$SubjectID)
+omn <- omat/as.vector(nsam)
+otu_table(psm) <- otu_table(omn, taxa_are_rows=FALSE)
+
+psm
+
+psm_step <- psm
+otu_table(psm_step) <- otu_table(psm_step) + 1
+
+de_merged <- getDEsigs(psm_step, ~Preterm, FDR=0.1)
+de_merged$species <- tax_table(psm_step)[rownames(de_merged),"Species"]
+de_merged
+```
+
+A clear association for Gardnerella, and from a high baseMean, even after merging samples from within subjects.

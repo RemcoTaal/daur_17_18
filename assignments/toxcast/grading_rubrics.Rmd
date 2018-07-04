@@ -1,0 +1,99 @@
+---
+title: "Grading - rubrics"
+author: "Marc A.T. Teunis"
+date: "7/14/2017"
+output: html_document
+---
+## Grading
+
+You grade will assessed according the following criteria:
+
+
+Criterion                             | Insufficient | Poor | Good | Excellent 
+--------------------------------------|--------------|------|------|------------------------
+
+### General             
+
+ - The code is handed in  
+ via a personal github    
+ repository              
+ - The Rmd file runs from
+ begin to end and renders 
+ correctly to an HTML file
+ - The code is commented 
+ and clearly structured 
+ - Code chunks do one thing 
+ at a time
+ - The 4 graphs are displayed
+ - The four qestions are 
+ addressed properly, the 
+ graph depicts what is 
+ required for each question 
+ in the case
+
+### Getting data
+
+ - The file is correctly 
+ loading and the dimensions 
+ are according the 
+ specifications in the case
+ - Missing values are 
+ assigned "NA" accordingly
+
+### Cleaning data
+
+ - Cleaning data steps 
+ and renaming variables 
+ is according best practices: 
+ "snake_case", no "special characters", 
+ no capitals etc. 
+ - Complete cases / 
+ missing values are insepected
+
+### Data wrangling
+
+ - The loaded data is stored 
+ in a dataframe (a tible or a data.frame)
+ - The proper variables 
+ are selected 
+ - The proper observations 
+ are filtered
+ - Data is summarized 
+ accordingly, if applicable
+
+### Visualizing data
+
+ - Plots are coded with the 
+ use of the {ggplot2} package
+ - Code is clearly written
+ - Axes are properly labelled
+ - Graphs are properly labelled 
+ with a title
+ - A panel/facets are used 
+ if applicable
+ - The plots are of good quality 
+ (resolution) and size
+ - Labels, text, geoms, axes, 
+ titles, points are of appropriate 
+ size (not too big / not too small)
+ 
+ 
+### General conclusion
+ 
+ - A general conclusion is supplied, 
+ that is valid for the supplied graphs
+ 
+### References
+
+ - If external code is used, 
+ references are supplied
+ - References to packages is 
+ used (you can include your session 
+ information in a document 
+ by using `sessionInfo()`)
+ 
+ Each criterion in the Rubrics is scored 1 - 4. The total amount of points that can be obtained is `r 24*4`
+ The grade is calculated by 
+ 
+## $GRADE=\frac{"total points obtained"}{"total points obtainable"}*10$
+

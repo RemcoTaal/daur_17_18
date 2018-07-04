@@ -1,0 +1,220 @@
+---
+title: "Conventions and Directives"
+author: "Marc A.T. Teunis"
+date: "`r Sys.Date()`"
+output:
+  ioslides_presentation: 
+    highlight: pygments
+    widescreen: yes
+---
+<style>
+
+.footer {
+    font-size: 16pt;
+    color: Black;
+    font-family: 'Helvetica'
+    content: attr(label);
+    position: absolute;
+    margin-left: auto;
+    margin-right: auto;
+    left: 0;
+    right: 0;
+    text-align:center;
+    bottom: 10px;
+    line-height: 1.9;
+    display: block;
+}
+
+</style>
+
+<div class="footer" style="margin-top;font-size:120%;"> 
+Using R in Life Sciences - January 2018 </div>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.width = 5, fig.height = 3)
+```
+
+```{r, root_1, include=FALSE}
+## defines the root of the project for later use
+require("rprojroot") || utils::install.packages("rprojroot")
+library(rprojroot)
+root <- find_root_file(criterion = is_rstudio_project)
+```
+
+## Code Style
+
+ * The slides in the course contain a number of style and syntax conventions.
+ * Code styles and syntax can vary
+ * Be consistent
+
+## Capitals vs lower case
+
+ * Everything in lower case:
+
+```{r}
+library(tidyverse)
+```
+
+## Printing a tbl_df
+```{r}
+table <- data_frame("a_is_a_variable" = c(1:5), "b_is_another_variable" = rnorm(5))
+table
+```
+
+## Variables
+
+ * All lower case
+ * Except R_LIB (system variables)
+ * Don't use capitals and special characters in file names
+
+"`excel_file_of_important_dataset.xlsx`"
+
+* Never use capitals in file extensions
+
+## Spaces
+
+ * Use an underscore as a space "_"
+ * NEVER use spaces or special characters in file names
+
+DON'T: "`data file + version 12_11_2017%.xlsx`"
+
+## Packages
+
+Names of R packages are indicated as:
+
+ * sometimes: {dplyr}
+ * mostly: `dplyr`
+ * not often: "dplyr"
+
+## Explicit functions
+
+When we want to be explicit about a certain function in a package:
+
+`dplyr::filter()`
+
+Refers to the `filter()` function in the package {dplyr}
+
+## Loose code in the slides
+Sometimes a few lines of codes are displayed for demo purpose:
+
+`four_numbers <- c(1:4)`
+
+`multiply <- 4*four_numbers`
+
+`sum(multiply^2)`
+
+## Code blocks
+
+Code blocks in slides are indicated as below:
+The result of the code is usually also displayed
+```{r, fig.height=2.5, fig.width=3}
+
+set.seed(1234)
+code_that_does_something <- rnorm(1000)
+hist(code_that_does_something, main = "rnorm")
+
+```
+
+## Hidding code 
+
+Sometimes it makes sense to hide the code and only display the result. 
+This can be done by setting the code chunk options `echo = FALSE`
+
+```{r, echo=FALSE, fig.height=2.5, fig.width=3}
+set.seed(1234)
+code_that_does_something <- rnorm(1000)
+hist(code_that_does_something, main = "rnorm")
+```
+
+## Hiding the result from a code chunk
+
+ * Like hiding the code, we can hide the result of that code and only display the code by setting `results = "hide"`
+ * Setting `eval = FALSE` means the chunk is not included in the slide show at all
+ * Setting `include = FALSE` means the chunk is run and the results are evaluated, but both the code and the results are not included in the slide-show
+ * Controlling setting for the complete document
+
+```{r, eval = FALSE}
+ knitr::opts_chunk$set(echo = TRUE,
+                       message = FALSE,
+                       warning = FALSE,
+                       error = TRUE,
+                       fig.width = 5, fig.height = 3)
+```
+ 
+ * There are many chunk options. Some we will see in later lessons
+
+## Data and file management
+
+ * Data for can be found in the "./data" folder of the course project
+ * Sometime data needs to be downloaded from the internet. Usually the code is provided, but sometimes you will have to write a few lines of code to download data for e.g. an exercise or a case study. 
+ * Many examples are with build-in data (e.g. `mtcars`, `ggplot2::diamonds` or `datasets::Indometh`)
+
+## Directions for gathering data
+
+* NEVER change a value of an original dataset
+* Add new variables to the dataset with recognizable names:
+
+```{r}
+set.seed(1234)
+table <- table %>% mutate(mean_new = mean(b_is_another_variable),
+                          sd_new = sd(b_is_another_variable))
+table
+```
+
+## Combining datatables
+When combining datasets it is good idea to create an identifier for each data set before combining.
+This enables you to trace a datapoint back to it's origin. 
+
+Let's create a second table, with the same variables as the first
+```{r} 
+set.seed(1234)
+table_2 <- data_frame("a_is_a_variable" = c(7:11), 
+                      "b_is_another_variable" = rnorm(5), 
+                      "id" = paste(c(1:5), "table_2", sep = "_")) %>% 
+  mutate(mean_new = mean(a_is_a_variable), 
+         sd_new = mean(b_is_another_variable)) %>% 
+  ## sorts the variables in the new table equal to the first table
+  select(id, a_is_a_variable, b_is_another_variable, 
+         mean_new, sd_new)
+table_2
+```
+
+## Adding an identifier to the first table
+```{r}
+set.seed(1234)
+table <- table %>% mutate(id = paste(c(1:5), "table", sep = "_")) %>% 
+  ## sorts the variables in the new table equal to the first table
+  select(id, a_is_a_variable, b_is_another_variable, 
+         mean_new, sd_new)
+table
+```
+
+## Now we bind the two together
+You can see the "id" variable in this joined table contains back-trace information on where the datapoint comes from
+```{r}
+names(table) == names(table_2)
+(table_join <- rbind(table, table_2))
+```
+ 
+## Data Governance 
+
+WIKIPEDIA: 12-05-2017:
+
+ * Is a control that ensures that the data entry by an operations team member or by automated processes meets precise standards, 
+ * The data governor uses data quality monitoring against production data to communicate errors in data for corrective action. 
+ * Is used by organizations to exercise control over processes and methods used by their data stewards and data custodians in order to improve data quality.
+ * Is a set of processes that ensures that important data assets are formally managed throughout the enterprise. 
+ * Esures that data can be trusted and that people can be made accountable for any adverse event that happens because of low data quality. 
+ * Is about putting people in charge of fixing and preventing issues with data so that the enterprise can become more efficient. 
+ * Also describes an evolutionary process for a company, altering the company’s way of thinking and setting up the processes to handle information so that it may be utilized by the entire organization. 
+ * It’s about using technology when necessary in many forms to help aid the process. When companies desire, or are required, to gain control of their data, they empower their people, set up processes and get help from technology to do it
+
+## Programming in Data Govenance
+
+ * Programming tools like R can help aid governance of data
+ * It helps debudding and finding errors, 
+ * But can also introduce errors!!
+ * It is reproducible and sharable
+ * Programming aids communication about data and what happened to the data (in terms of gathering, cleaning, combining, filtering, visualizing)
+
+
