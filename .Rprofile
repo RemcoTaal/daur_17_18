@@ -9,6 +9,6 @@ To download (or clone) the complete materials for the first time
 type 
 
 'system(git clone https://www.github.com/uashogeschoolutrecht
-/ur4ls)'
+/daur_17_18)'
 in the Console or in a script and press Enter or Run, respectively.")
 

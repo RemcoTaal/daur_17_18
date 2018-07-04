@@ -1,12 +1,11 @@
 ---
-title: 'Getting started; Get the R scripts'
+title: 'Getting started'
 author: "Marc A.T. Teunis"
 date: "`r Sys.Date()`"
 output:
   ioslides_presentation: 
     highlight: pygments
     widescreen: yes
-runtime: shiny_prerendered
 ---
 <style>
 
@@ -29,7 +28,7 @@ runtime: shiny_prerendered
 </style>
 
 <div class="footer" style="margin-top;font-size:120%;"> 
-Data Analysis Using R - November 2017 </div>
+Data Analysis Using R - `r Sys.Date()` </div>
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, fig.width = 5, fig.height = 3)
 ```
@@ -41,15 +40,136 @@ library(rprojroot)
 root <- find_root_file(criterion = is_rstudio_project)
 ```
 
-## The R scripts
+## R is Case sensitive
 
-The book "Discovering Statitics Using R" has many resources online. The R scripts used in the book can be downloaded as zip archives. In the code below we extract these archives so that we can work with them in R.
-The zip files are located in the folder `./code`. After running the code below the R code from the book chapters will be available in the folder `./code`.
+*_Important note: R is case-sensitive, meaning that it will matter whether you use capital or lower case, keep this in mind if you get a cryptic warning or error!_*
 
-```{r}
-path_to_zipfiles <- file.path(root, "code")
-zipF <- list.files(path = path_to_zipfiles, pattern=".zip", full.names = T); sapply(zipF, unzip, exdir = path_to_zipfiles)
+## Cloud server for RStudio
 
+ - Preinstalled version of the R-IDE (integrated development environment) RStudio
+ - Runs on a remote server and has all the add-ons that are needed to run the code. 
+ - Login with the credentials supplied at the beginning of the course. 
+
+To login to this server:
+
+ https://rserver.innovativetesting.nl
+
+
+## RStudio interface
+```{r fig.width=10,echo=FALSE}
+library(png)
+library(grid)
+img_rstudio <- readPNG(source = paste0(root, "/images/1a_rstudio_interface.png"))
+ grid.raster(img_rstudio)
 ```
 
 
+## Setting up package repositories
+- Default RStudio has only enabled the CRAN repository, but there are other useful repositories that contain nice R packages. 
+- Enable the Bioconductor repositories (located at http://www.bioconductor.org) as packages from these repositories are often used in molecular biology. 
+- We only need to do this once, so the next time you start Rstudio it remembers which repositories are enabled. 
+- Type in the Console window (not the R script window!) the following command: 
+
+```{r, eval = FALSE}
+setRepositories(graphics=TRUE)
+```
+
+## Initiate an RStudio project
+From the File menu choose _New Project_, than choose _New Directory_. Provide the project with the name: _"r_course"_
+
+## Cloning the course materials from Github.com
+
+ 1. Create an account on www.github.com
+ 2. Login in to github.com and go to 
+ www.github.com/uashogeschoolutrecht/daur_17_18
+ 3. Copy the _url_ address
+ 4. Start a new project in RStudio-Server, 
+ choose _"Version Control"_
+ 5. Copy the 'clone' link in the 'url' field, press enter
+ 6. Let the clone finish
+ 
+**Follow the steps above first before continuing**
+
+Did it work? Please let me know if not.
+
+## About this document: Literate programming
+
+ - This document is an R-markdown document. 
+ - To create documents containing normal text, code and output of that code together. 
+ - So-called _"Literate Programming"_
+ - Part of the "Reproducible research" philosophy.
+ - R Markdown can also include and interpret LaTeX, which is used much in the technical fields. 
+ - It can render formulas's as well
+ 
+## Example formula in LaTeX
+ 
+ Working_with_R = $\sqrt[root](absolute(\frac{Participants\;fun}{much\;persistence}))$
+
+## Where do my files live?
+ - The root of a project can be defined by:
+```{r} 
+ 
+if (!require("rprojroot")) install.packages("rprojroot")
+library(rprojroot)
+root <- find_root_file(criterion = is_rstudio_project)
+root
+``` 
+ 
+To see what the current working directory is, you can execute the command
+
+`getwd()` 
+
+in the Console window. Try it now!
+
+If all went well the latter half of the working directory will state "/r_course"
+
+## Creating a new R script
+ - Start by creating an R script file that will contain all the steps taken to get to a certain result. 
+ - Initially a scrapbook to note down what exactly you did. 
+ - Annotate scripts with `# Comments`
+ - During this course, we will create a special R script file (`.Rmd`) for every exercise that contains the steps of that particular exercise (for instance a file named `"exercise_intro_to_r_exercise.Rmd"`). 
+
+## How to run the code in RStudio
+
+This document contains code chunks:
+```{r, eval=FALSE} 
+# a code chunk begins with ```{r}
+y <- rnorm(100)
+x <- sum(y)
+x
+hist(y)
+# and ends with ```
+``` 
+
+## Running your first R-code
+These so called code chunks contain R code that does something: 
+
+For example: calculate the mean of a number of random normal numbers. 
+Without running the code, can you guess what the mean will approximately be?
+Why is it not eaxactly 10?
+```{r, results='hide'}
+set.seed(12345)
+random <- rnorm(n = 1000, mean = 10, sd = 1.5)
+mean(random)
+hist(random, breaks = 80)
+```
+_*Try adjusting the `n = 100` and the `breaks` arguments, to a larger or smaller number*_
+
+## Run the code chunks as follows:
+place the cursor somewhere in a code chunk and between the 
+` ```{r} ` and the ` ``` ` and press the keys: 
+
+`Ctrl` `Shift` and `Enter` simultaneously. 
+
+The code will run and the results will show either in the console, or below the code chunk. 
+
+## Run a line of code as follows:
+
+ - Place the cursor somewhere on the line that you want to run.
+ - Press the keys:
+
+`Cntrl` and `Enter` simultaneously.
+
+You can also run a piece of code by selecting the code by dragging the cursor and left-click mouse, and entering:
+
+`Cntrl` and `Enter` simultaneously.
