@@ -28,7 +28,7 @@ output:
 </style>
 
 <div class="footer" style="margin-top;font-size:120%;"> 
-Data Analysis Using R - January 2018 </div>
+Data Analysis Using R - `r Sys.Date()` </div>
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE,
@@ -56,18 +56,20 @@ library(ggplot2)
 library(drc)
 library(tidyverse)
 ## Bionconductor
-# source("https://bioconductor.org/biocLite.R")
+source("https://bioconductor.org/biocLite.R")
 # biocLite("DESeq2")
 #biocLite("GEOquery")
 #biocLite("tximport")
 #biocLite("tximportData")
-biocLite("pasilla")
+#biocLite("pasilla")
 library(DESeq2)
 library(GEOquery)
 library("tximport")
 library("readr")
 library("tximportData")
 library(pasilla)
+#biocLite("vsn")
+#install.packages("ashr")
 ```
 
 ## Circos plot
@@ -394,8 +396,7 @@ raw_map(data = df$vals,
     scale_fill_viridis()
 ```
 
-## RNA sequencing
-```{r}
+```{r, eval=FALSE}
 library(DESeq2)
 #browseVignettes('DESeq2')
 ## ----setup, echo=FALSE, results="hide"-----------------------------------
@@ -942,7 +943,7 @@ plotPCA(rld)
 #  res$padj <- ifelse(is.na(res$padj), 1, res$padj)
 
 ## ----sessionInfo---------------------------------------------------------
-sessionInfo()
+#sessionInfo()
 
 
 ```
@@ -1000,26 +1001,10 @@ pwm
 pwm <- makePWM(pwm)
 ```
 
-## Sequence logog plot
+## Sequence logo plot
 ```{r}
 #png("hunchback.png")
 seqLogo(pwm)
 # dev.off()
 
 ```
-
-
-
-## Interactive plot
-```{r}
-
-library()
-
-
-
-
-
-
-```
-
-
