@@ -1,0 +1,245 @@
+---
+title: "R opdracht"
+authors: "Marina, Samantha en Rushanella"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+
+#Inleiding
+#In blok B van de minor "applied bioanalytical and pharmaceutical chemistry" werd het vak R geïntroduceerd. In deze cursus wordt ons geleerd hoe je grote databestanden kunt analyseren. Excel heeft namelijk een limiet aan de hoeveelheid data wat geanalyseerd kan worden. Zo hebben wij de opdracht gekregen om met een dataset te werken, om ons kennis in R te verbreden. Wij hebben voor de dataset toxcast gekozen. Deze dataset is afkomstig van ToxRefDB. De dataset toxcast beschrijft een uitgebreide studie, van verschillende in vitro assays diermodellen om toxicologie datasets bij elkaar te zetten, en om te kijken of er voorspellingen gedaan kunnen worden over de veiligheid van stoffen. De type data van de objecten in deze database zijn: numeric, integer en character. De experimentele variabelen zijn: ldt, hdt, lel_dose, nel_dose, loael_dose en noael_dose.
+
+
+```
+
+
+```{r}
+if (!require("rprojroot")) install.packages("rprojroot")
+library(rprojroot)
+root <- find_root_file(criterion = is_rstudio_project)
+root
+```
+
+```{r}
+# Import the data into R 
+
+library(readr)
+toxrefdb_nel_lel_noael_loael_summary_AUG2014_FOR_PUBLIC_RELEASE <- read_csv("capstone/data/toxcast/toxrefdb_nel_lel_noael_loael_summary_AUG2014_FOR_PUBLIC_RELEASE.csv")
+
+#View(toxrefdb_nel_lel_noael_loael_summary_AUG2014_FOR_PUBLIC_RELEASE)
+```
+
+
+```{r}
+#Laden van benodigde packages 
+library(dplyr)
+library(ggplot2)
+library(tidyverse) #Package data tidy maken
+```
+
+```{r}
+#User relative paths 
+path_to_file_toxcast <- file.path(root, "capstone/data/toxcast/toxrefdb_nel_lel_noael_loael_summary_AUG2014_FOR_PUBLIC_RELEASE.csv")
+
+toxcast <- toxrefdb_nel_lel_noael_loael_summary_AUG2014_FOR_PUBLIC_RELEASE
+
+```
+
+```{r}
+head(toxcast) #check de data 
+tail(toxcast) #check de data 
+ls(toxcast) # Lijst van de data 
+str(toxcast) #data-type of the variable
+class(toxcast)#klasse van data
+dim(toxcast)# aantal observaties en variabelen 
+toxcast
+
+```
+
+```{r}
+nrow(toxcast) #number of rows
+ncol(toxcast) #number of variables
+names(toxcast) #names of the variables
+ 
+toxcast$X1 #gegevens zien van bepaalde kolommen 
+toxcast$chemical_id
+```
+
+```{r}
+#summary statistics of each variable that shows confidence intervals, max, min, mean, median values and code that asserts the data-type of each variable
+summary(toxcast)
+```
+
+
+```{r}
+sum(is.na(toxcast)) #  missing values
+str(toxcast) # do the variables have the right type
+arrange(toxcast)
+```
+
+
+```{r}
+toxcast <- read.csv(file = path_to_file_toxcast, na.strings = c("NULL", "")) #Null omzetten in NA
+complete.cases(toxcast) #NA aanwezig? -> FALSE
+toxcast$source_study_alphanumeric_id <- NULL #kolom verwijderen, want kolom bevat zelfde info als ander kolom  
+sum(is.na(toxcast)) #  missing values
+toxcast <- na.omit(toxcast) #verwijderen van NA's 
+sum(is.na(toxcast)) #Check aantal NA's
+```
+
+```{r}
+levels(toxcast$dose_unit) #check van variabelen ivm tidy maken van data 
+```
+
+```{r}
+toxcast<- as.tibble(toxcast)
+toxcast_complete <- toxcast %>%
+  filter(dose_unit == "mg/kg/day") 
+```
+
+
+```{r}
+# Rename a column in R
+colnames(toxcast_complete)[colnames(toxcast_complete)=="chemical_sets"] <- "chem_sets"
+colnames(toxcast_complete)[colnames(toxcast_complete)=="entry_level_id"] <- "entry_lvl_id"
+colnames(toxcast_complete)[colnames(toxcast_complete)=="source_study_numeric_id"] <- "source_study_num_id"
+colnames(toxcast_complete)[colnames(toxcast_complete)=="study_level_loael_dose_level"] <- "study_lvl_loael_dose_lvl"
+```
+
+```{r}
+names(toxcast_complete) <- tolower(names(toxcast_complete)) #hoofdletters uithalen 
+```
+
+```{r}
+toxcast_data <- toxcast_complete
+toxcast_data <- select(toxcast, "chemical_name","species", "admin_method", "dose_start", "dose_start_unit", "dose_end", "dose_end_unit", "ldt", "hdt", "dose_unit", "effect_category", "loael_dose", "noael_dose") #selecteren van variabelen 
+```
+
+```{r}
+toxcast_data <- as.tibble(toxcast_data)
+toxcast_complete <- toxcast_data %>%
+  filter(dose_unit != "ppm") 
+```
+
+
+```{r}
+#berekenen van gemiddelden van de gefilterde kolommen 
+names(toxcast_complete)
+toxcast_summary <- toxcast_complete %>%
+  select(chemical_name:noael_dose) %>%
+  group_by(species) %>%
+  summarise(mean_dose_start = mean(dose_start),  
+            mean_dose_end = mean(dose_end),
+            mean_ldt = mean(ldt),
+            mean_hdt = mean(hdt),
+            mean_loael_dose = mean(loael_dose),
+            mean_noael_dose = mean(noael_dose)) %>%
+  arrange(species) #op alfabetische volgorde 
+```
+
+```{r}
+names(toxcast_complete)
+plot_ldt_hdt <- ggplot(data = toxcast_complete,
+                       aes(x = ldt, y = hdt, color = species)) +
+  geom_point() + geom_jitter(position = "jitter") +
+  ggtitle("Verhouding ldt en hdt") +
+  xlab("ldt (mg/kg/dag)") +
+  ylab("hdt (mg/kg/dag)")
+plot_ldt_hdt
+```
+
+```{r}
+names(toxcast_complete)
+plot_verhouding_ldt_hdt <- ggplot(data = toxcast_complete,
+                       aes(x = ldt, y = hdt)) +
+  geom_point() + geom_jitter(position = "jitter") +
+  facet_wrap( ~ species)+
+  ggtitle("Verhouding ldt en hdt per dier") +
+  xlab("ldt (mg/kg/dag)") +
+  ylab("hdt (mg/kg/dag)")
+plot_verhouding_ldt_hdt
+```
+
+
+```{r}
+names(toxcast_complete)
+plot_ldt <- ggplot(data = toxcast_complete,
+                       aes(x = species , y = ldt)) +
+  geom_point() + geom_jitter(position = "jitter") +
+  ggtitle("ldt per dier") +
+  xlab("dieren") +
+  ylab("ldt (mg/kg/dag)")
+plot_ldt
+```
+
+```{r}
+names(toxcast_complete)
+plot_hdt <- ggplot(data = toxcast_complete,
+                       aes(x = species , y = hdt)) +
+  geom_point() + geom_jitter(position = "jitter") +
+  ggtitle("hdt per dier") +
+  xlab("dieren") +
+  ylab("hdt (mg/kg/dag)")
+plot_hdt
+```
+
+
+```{r}
+plot_maximale_geteste_dosis <- ggplot(data = toxcast_complete, 
+       aes(x = species, y = hdt)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Maximale geteste dosis op dieren")+
+  xlab("dieren")+
+  ylab("hdt (mg/kg/dag)")
+plot_maximale_geteste_dosis
+```
+
+```{r}
+plot_laagst_waargenomen_effectniveau <- ggplot(data = toxcast_summary, aes(x=species, y=mean_loael_dose)) +
+  geom_bar(stat = "identity") + ylab("mean_loael_dose") +
+  xlab("species") + ggtitle("Laagst waargenomen effectniveau per dier")+
+  xlab("dieren")+
+  ylab("loael (mg/kg/dag)")
+plot_laagst_waargenomen_effectniveau 
+```
+
+```{r}
+plot_geen_waargenomen_effectniveau <- ggplot(data = toxcast_summary, aes(x=species, y=mean_noael_dose)) +
+  geom_bar(stat = "identity") + ylab("mean_noael_dose") +
+  xlab("species") + ggtitle("Geen waargenomen effectniveau per dier")+
+  xlab("dieren")+
+  ylab("noael (mg/kg/dag)")
+plot_geen_waargenomen_effectniveau 
+```
+
+
+```{r}
+
+#Resultaten
+#plot_ldt: is de minimum dosis chemicaliën wat getest is op een dier. De grafiek laat de minimale concentraties van chemicaliën zien die toegediend zijn aan een dier. Ze hebben het meest getest op ratten en konijnen, de hamsters daarentegen zijn minder vaak gebruikt als proefdieren. Bij ratten en konijnen wordt er een grote spreiding waargenomen. 
+#plot_hdt: is de maximale dosis chemicaliën wat getest is op een dier. De grafiek laat de maximale concentraties van chemicaliën zien die toegediend zijn aan een dier. Bij muizen wordt er een grote spreiding waargenomen. Ook hier zien we dat ratten het meest werden gebruikt als proefdieren. Als we de twee plotjes met elkaar vergelijken (ldt en hdt) dan wordt er naar schatting tussen de 100 mg/kg/dag en 1500 mg/kg/dag chemicialen aan de dieren toegediend. 
+#plot_laagst_waargenomen_effectniveau: loael is de laagst waargenomen effectniveau op een dier. Uit het plotje blijkt dat de dieren een andere grenswaarde hebben. Zo, moeten muizen meer chemicaliën toegediend krijgen om een effect te tonen. De honden daarentegen hebben een veel lagere dosis nodig om een effect te tonen. 
+#plot_geen_waargenomen_effectniveau: noael is de dosis wat aan een dier is toegediend, maar waar er geen effect bij de dieren is waargenomen. Ook hier zien we dat muizen een hogere dosis aankunnen. En ook hier toont het plotje aan dat honden alle bij een lagere concentratie al effect tonen. Ratten en konijnen geven bijna dezelfde resultaten.
+ 
+```
+
+```{r}
+
+#Conclusie 
+#Er werden testen op dieren uitgevoerd om een voorspelling te kunnen doen over hoe gevaarlijk en giftig chemicaliën kunnen zijn op de gezondheid. Er werden verschillende dieren getest, voornamelijk kleine dieren, zoals: hamster, ratten en muizen. De dieren vertonen onderling verschillende effecten op verschillende dosis. Het ene dier toont eerder een effect bij een bepaald toegediende concentratie dan het andere dier. Om erachter te komen of bepaalde chemicaliën voor de mens gevaarlijk is, moet er een representatief proefdier gebruikt worden.
+
+```
+
+
+

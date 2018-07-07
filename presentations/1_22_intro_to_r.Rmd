@@ -3,8 +3,9 @@ title: "Intro to R"
 author: "Marc A.T. Teunis"
 date: "`r Sys.Date()`"
 output:
-  word_document: default
-  html_document: default
+  ioslides_presentation: 
+    highlight: pygments
+    widescreen: yes
 ---
 <style>
 
@@ -27,7 +28,7 @@ output:
 </style>
 
 <div class="footer" style="margin-top;font-size:120%;"> 
-Using R in Life Sciences - January 2018 </div>
+Data Analysis Using R - `r Sys.Date()` </div>
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, fig.width = 5, fig.height = 3)

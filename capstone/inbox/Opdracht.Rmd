@@ -1,0 +1,231 @@
+---
+title: "Opdracht"
+author: "Thomas Koops"
+date: "15 januari 2018"
+output: html_document
+---
+#Inleiding
+In October 2014 werd door de US Environmental Protection Agency de ToxCast ToxRefDB datasets gepubliceerd. In dit verslag zal de "toxrefdb_study_endpoint_summary_AUG2014_FOR_PUBLIC_RELEASE.csv" dataset onderzocht worden.
+De toxref dataset bestaat uit data van 5570 wetenschappelijke artikelen over de giftigheid van bepaalde chemicaliën op dieren. Met name heeft deze dataset focus op de laagste dosering voordat en nadat er zichtbare effecten plaatsvinden bij het dier en wanneer deze effecten schadelijk worden. 
+De dataset zal onderzocht worden of er een correlatie is tussen lichaamsgewicht van een dier en zijn weerstand tegen chemicaliën, er zal onderzocht worden welke administratie methoden welke effecten meebrengt en er zal onderzocht worden bij welke dosis chloorthalonil effect heeft bij verschillende dieren.
+
+```{r}
+## defines the root of the project for later use
+require("rprojroot") || utils::install.packages("rprojroot")
+library(rprojroot)
+require("readr") || utils::install.packages("readr")
+library(readr)
+require("tidyverse") || utils::install.packages("tidyverse")
+library("tidyverse")
+root <- find_root_file(criterion = is_rstudio_project)
+
+
+toxref_raw <- read_csv("toxrefdb_nel_lel_noael_loael_summary_AUG2014_FOR_PUBLIC_RELEASE.csv")
+```
+```{r}
+#tidy data
+
+#removes uppercases from the variables
+toxref_raw <- data.frame(lapply(toxref_raw, function(v) {
+  if (is.character(v)) return(tolower(v))
+  else return(v)
+}))
+
+#removes whitespaces, first it removing leading and trailing whitespaces then replaces all remaining whitespaces with underscores
+toxref_raw <- as.data.frame(apply(toxref_raw,2,function(x)trimws(x, which = c("both", "left", "right"))))
+toxref_raw <- as.data.frame(apply(toxref_raw,2,function(x)gsub('\\s+', '_',x)))
+
+```
+```{r}
+#inspect the integrity of the data
+ 
+#makes a list of what type of data is in each column and transforms it into a dataframe
+df_names <- do.call(rbind.data.frame, lapply(toxref_raw, typeof))
+df_names$name <- names(toxref_raw)
+df_names <- df_names[,c(2,1)]
+colnames(df_names)[2] <- "type"
+
+#summary of each variable that's not a character
+
+no_character_names <- filter(df_names,type != "character")
+no_character_toxref <-na.omit(select(toxref_raw, no_character_names$name))
+summary_toxref <- lapply(no_character_toxref, summary)
+df_summary_toxref <- do.call(rbind.data.frame,lapply(no_character_toxref, summary))
+df_summary_toxref <- setNames(df_summary_toxref, c("min","1st_qu", "median", "mean","3rd qu","max"))
+df_summary_toxref <- df_summary_toxref[c(1:6)]
+df_summary_toxref$name <- no_character_names$name
+df_summary_toxref <- df_summary_toxref[,c(7,1:6)]
+df_summary_toxref$number <- c(1:53)
+#changes df_summary_toxref$min from a scientific notation to a normal notation
+df_summary_toxref$min <- as.list(df_summary_toxref$min)
+
+#function that calculates the error for confindence interval with argument column for the no_character_toxref column that is used and percentage for the level of confidence
+conf_interval_toxref <- function(column,percentage){
+  colu_number <- unlist(subset(df_summary_toxref, name == column, "number"))
+  std_dev <- sd(unlist(no_character_toxref[colu_number]))
+  n <- count((no_character_toxref[colu_number]))
+  error <- qnorm(percentage)*std_dev/sqrt(n)
+  return(error)
+}
+#function that calculates the mean with argument column for the no_character_toxref column used
+mean_toxref <- function(column){
+  colu_number <- as.numeric(unlist(subset(df_summary_toxref, name == column, "number")))
+  mean <- mean(unlist(no_character_toxref[colu_number]),na.rm=TRUE)
+  return(mean)
+}
+#calculating the error for confidence and mean values
+
+conf_interval_values <- t(data.frame(sapply(unlist(df_names[1]), conf_interval_toxref,percentage = 0.95)))
+#due to a error in the mean_toxref function the following chunks can not be loaded
+#mean_values <- t(data.frame(lapply(unlist(df_names[1])), mean_toxref))
+#calculating the left and right end of the confidence interval 
+#left_conf_int <- unlist(unlist(mean_values) - unlist(conf_interval_values))
+#right_conf_int <- unlist(unlist(mean_values) + unlist(conf_interval_values))
+#adding the left and right end of the confidence interval to df_summary_toxref
+#df_summary_toxref$left_conf_inter <- left_conf_int
+#df_summary_toxref$right_conf_inter <- right_conf_int
+colnames(df_summary_toxref)[colnames(df_summary_toxref)=="left_conf_int.unlist(mean_values) - unlist(conf_interval_values)"] <- "left_conf_inter"
+colnames(df_summary_toxref)[colnames(df_summary_toxref)=="right_conf_int.unlist(mean_values) + unlist(conf_interval_values)"] <- "right_conf_inter"
+#Summary that shows confidence intervals, max, min, mean, 1st and 3rd quarter and median values
+df_summary_toxref
+#number of rows
+nrow(toxref_raw)
+#data-type of each variable
+df_names
+
+```
+
+```{r}
+#Selecting, filtering, mutating and summarizing
+
+#selects the columns that will be used
+toxref_tidy <- subset(toxref_raw, select=c("X1", "chemical_name","entry_status_id" , "usability_desc","admin_method","admin_route" ,"study_type",  "species","effect_category","lel_qualifier","lel_dose","nel_qualifier","nel_dose","loael_qualifier","loael_dose","noael_qualifier","noael_dose"))
+
+#bodyweight dataframe
+toxref_bw <- subset(toxref_raw, select=c("X1", "species","strain"))
+
+#adding body weight to each of the species (Environmental Protection Division, 1996)
+toxref_bw$body_weight <- ifelse(toxref_bw$species=="guinea-pig", 700,
+        ifelse(toxref_bw$species=="mink", 1000,
+        ifelse(toxref_bw$species=="mouse", 60,
+        ifelse(toxref_bw$species=="rabbit", 3000,
+        ifelse(toxref_bw$species=="rat", 400,
+        ifelse(toxref_bw$species=="dog", 35000,
+                        NA  ))))))
+toxref_tidy$body_weight <- toxref_bw$body_weight
+```
+
+```{r}
+#corralation body weight and lel, nel, loael, noael with the most frequent chemical
+
+
+#most frequent chemical
+most_freq_chem <- rownames(data.frame(tail(sort(table(toxref_tidy$chemical_name)),1)))
+#how many times the chemical is used between species
+table(toxref_tidy$species, toxref_tidy$chemical_name == most_freq_chem)
+toxref_most_freq_chem <- subset(toxref_tidy, subset = toxref_tidy$chemical_name == most_freq_chem)
+
+toxref_bw_dose <- subset(toxref_most_freq_chem, select=c("lel_dose", "nel_dose","loael_dose","noael_dose","body_weight"))
+#to prevent outliers values above the 10000g will be discarded
+toxref_bw_dose <- subset(toxref_bw_dose, subset = toxref_bw_dose$body_weight < 10000)
+toxref_bw_dose <- 
+   toxref_bw_dose %>%
+  gather("lel_dose", "nel_dose","loael_dose","noael_dose", key="dose_type", value = "dose")
+toxref_bw_dose[toxref_bw_dose == "null"] <- NA
+toxref_bw_dose <- na.omit(toxref_bw_dose)
+toxref_bw_dose$dose <- as.double(toxref_bw_dose$dose)
+ggplot(data = toxref_bw_dose) +
+  geom_point(mapping=aes(jitter(x=toxref_bw_dose$body_weight, 1),y=toxref_bw_dose$dose, color = toxref_bw_dose$dose_type)) +
+  geom_smooth(mapping=aes(x = toxref_bw_dose$body_weight,y=toxref_bw_dose$dose, color = toxref_bw_dose$dose_type), method = "lm", alpha = 0.25)+ xlab ("body weight in grams") + ylab("dose in mg/kg/day")+ ggtitle("Corralation between body weight and resistance against chlorothalonil")+ labs(color = "dose type")
+
+```
+```{r}
+toxref_admin_effect <- subset(toxref_tidy, select=c("admin_method", "study_type","admin_route"))
+
+#correlation between administration method and the effect it had
+admin_effect_count <- function(method){
+  count <- table(toxref_admin_effect$study_type, toxref_admin_effect$admin_method== as.character(method))[,2]
+  effect <- rownames(table(toxref_admin_effect$study_type,toxref_admin_effect$admin_method==as.character(method)))
+  return <- data.frame(method,effect,count)
+  rownames(return) <- c()
+  return(return)
+}
+#code below doesn't seem to work so it will be done manually
+#toxref_admin_effect_count <- data.frame(lapply(as.list(data.frame(unique(toxref_admin_effect_sample$admin_method))), admin_effect_count))
+#not_reported and [not_specified] were left out because they were unable to say anything about the effect of a administration method
+toxref_admin_effect_count <- rbind(
+  admin_effect_count("capsule"), 
+  admin_effect_count("feed"),
+  admin_effect_count("gavage/intubation"),
+  admin_effect_count("intramuscular"),
+  admin_effect_count("intraperitoneal"),
+  admin_effect_count("intravenous"),
+  admin_effect_count("nose-only"),
+  admin_effect_count("subcutaneous"),
+  admin_effect_count("topical"),
+  admin_effect_count("water"),
+  admin_effect_count("whole-body")
+)
+total_freq <- data.frame(table(toxref_admin_effect$admin_method))
+assign_freq <- function(method){
+   freq <- filter(total_freq, as.character(method)==total_freq$Var1)[,2]
+   return(freq)
+}
+all_freq <- t(data.frame(lapply(toxref_admin_effect_count$method, assign_freq)))
+toxref_admin_effect_count$freq_method <- all_freq
+toxref_admin_effect_count$percentage_effect <- toxref_admin_effect_count$count/toxref_admin_effect_count$freq_method*100
+
+ggplot(toxref_admin_effect_count, aes(x =factor(1), y = percentage_effect, fill = factor(effect, labels = c("chronic/cancer","Prenatal developmental","multigenerational reproductive","Subacute","Subchronic")))) + 
+    geom_bar(stat = "identity", width = 1) + 
+   scale_x_discrete(NULL, expand = c(0,0)) +
+    scale_y_continuous(NULL, expand = c(0,0)) + 
+    coord_polar(theta = "y") +
+    facet_wrap(~method)+ 
+    ylab("percentage")+ 
+    ggtitle("Effects caused by method")+
+    labs(fill ="effect")
+
+```  
+
+
+
+```{r}
+#looking at the lel, loael, nel and noael dose of different animals for the chemical chlorothalonil
+dose_levels <- function(species){
+spec_set <- filter(toxref_tidy, toxref_tidy$species==as.character(species))
+chem <- filter(spec_set, spec_set$chemical_name=="chlorothalonil")
+chem <- subset(chem, select=c("lel_dose", "nel_dose","loael_dose","noael_dose"))
+average <- data.frame(rbind(c(mean(as.numeric(chem$lel_dose), na.rm = TRUE),"lel_dose"),
+               c(mean(as.numeric(chem$nel_dose), na.rm = TRUE),"nel_dose"),
+               c(mean(as.numeric(chem$loael_dose), na.rm = TRUE),"loael_dose"),
+               c(mean(as.numeric(chem$noael_dose), na.rm = TRUE),"noael_dose")))
+
+average$species <- as.character(species)
+
+return(average)
+}
+#dogs, mice, rabbits and rats have values for chlorothalonil
+toxref_species_chloro<- rbind(dose_levels("dog"),
+                              dose_levels("mouse"),
+                              dose_levels("rabbit"),
+                              dose_levels("rat"))
+colnames(toxref_species_chloro) <- c("average_dose","dose_type","species")
+toxref_species_chloro$average_dose <- c(toxref_species_chloro$average_dose)
+
+ggplot(data = toxref_species_chloro,mapping=aes(x=dose_type, y=average_dose, fill=species)) +
+  geom_bar(stat = "identity", position=position_dodge())+ xlab ("effect") + ylab("average dose in mg/kg/day")+ ggtitle("Effects chlorothalonil on different animals")
+
+```
+#Resultaten
+Bij de eerste grafiek (Corralation between body weight and resistance against chlorothanolonil) was er voor elk dier soort een geschat gewicht toegevoegd op basis van informatie van het Enviormental Protection division en gekeken of het lichaamsgewicht de lel/nel/loael en noael dosissen zou verhogen. Wel is in de grafiek een helling te zien  maar ook is de spreiding erg groot, wat te zien is aan het grote grijze gebied rond de lijnen.
+Bij de tweede grafiek (Effects caused by method) was er voor elke administratie methode onderzocht welke effecten het meest voorkwamen. Een cirkeldiagram werd hiervoor gemaakt waarbij elke administratie methode een eigen cirkel heeft waarbij aangegeven staat het percentage van elk effect dat plaats vond. 
+Bij de derde grafiek (Effects chlorothalonil on different animals) was er onderzocht bij welke doseringen verschillende dieren effecten begonnen te krijgen. Hierbij was door een fout in de code die niet op tijd gemaakt kon worden de dosering niveaus van alle dieren hetzelfde. Door deze fout is de y-as ook verkeerd gelabeld. Wel is te zien dat de lel dosering (1119 mg/kg/dag) boven de loael dosering (1045 mg/kg/dag) ligt, hetzelfde geld voor de nel (856 mg/kg/dag) en noael (765 mg/kg/dag) doseringen. Omdat lel (lowest effect level) altijd voor loael (lowest observed adverse effect level) komt en nel (no effect level) altijd voor noael (no observed adverse effect level) komt. Dit kan misschien het gevolg zijn van foute codering.
+
+#Conclusie
+In de eerste grafiek was het doel te vinden of er een correlatie tussen lichaamsgewicht en weerstand tegen chemicaliën is. Hoewel er de ijklijnen wel een positieve helling hadden kon er door de grote spreiding tussen de verschillende observaties niet met zekerheid gezegd worden of er inderdaad een correlatie tussen is. In vervolg onderzoek zou er uit gezocht kunnen worden waar deze grote spreiding vandaan komt en deze variabele eventueel mee te nemen in de grafiek
+In de tweede grafiek was het doel om de effecten van verschillende administratie methoden te visualiseren. Hierbij is wel het probleem dat allerlei verschillende chemicaliën gebruikt werden tussen de administratie methodes waardoor er een onzekere variabele tussen zit. In vervolg onderzoek kan gekeken worden om veel data van één chemicalie met verschillende administratie methodes toe te passen. 
+Bij de derde grafiek was het doel om minimale dosissen te vinden voordat chloorthalonil (schadelijke) effecten veroorzaakt bij verschillende dieren. Hierbij was er een fout in de code waardoor de dosis waarden van alle dieren gelijk waren en de y-as niet correct werd. Deze problemen zullen eerst opgelost moeten worden voordat er echt een conclusie uit getrokken kan worden.
+
+
+#Referenties
+Enviormental Protection division (1996). ANIMAL WEIGHTS and their FOOD AND WATER REQUIREMENTS. Retrieved from http://www.env.gov.bc.ca/wat/wq/reference/foodandwater.html

@@ -1,0 +1,313 @@
+---
+title: "Capstone Assignment"
+author: "Tracy van de Watering en Vivian Westland"
+date: "25-1-2018"
+output: html_document
+---
+
+<style>
+
+.footer {
+    font-size: 16pt;
+    color: Black;
+    font-family: 'Helvetica'
+    content: attr(label);
+    position: absolute;
+    margin-left: auto;
+    margin-right: auto;
+    left: 0;
+    right: 0;
+    text-align:center;
+    bottom: 10px;
+    line-height: 1.9;
+    display: block;
+}
+
+</style>
+
+```{r, root_1, include=FALSE}
+## defines the root of the project for later use
+require("rprojroot") || utils::install.packages("rprojroot")
+library(rprojroot)
+root <- find_root_file(criterion = is_rstudio_project)
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, 
+                      results = "show", 
+                      warning = FALSE,
+                      message = FALSE, 
+                      error = FALSE, 
+                      fig.show = 'show')
+```
+
+## Introduction
+The toxcast dataset contains information about the toxicity of different compounds. The dataset contains various variables including NOAEL/NEL (No Effect Level), LOAEL/LEL (Lowest Effect Level), species and study type. In this analysis, the NEL dose and the LEL dose are further examined. The NEL is the No Effect Level, it is the highest dose at which there was no observed toxic effect. The LEL is the Lowest Effect Level, it is the lowest dose at which a toxic effect was observed. The higher the concentration of the NEL and the LEL, the safer the compound. The toxic chemicals are tested on different species including a dog, rat, hamster, rabbit and a mouse. The chemicals are also tested in different study types. This study type contains a few categories including CHR (chronic/cancer), MGR (multigenerational reproductive), DEV (Prenatal developmental), SUB (Subchronic), SAC (Subacute) and REP (reproductive fertility). The aim of the analysis is to determine the toxicity (the NEL and the LEL) of the chemicals for different study types.
+
+## Reading data into R
+```{r}
+## loading packages
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(forcats)
+library(pander)
+
+## creating a path for the toxcast dataset
+toxcast_data <- file.path(root, "capstone", "data", "toxcast", "toxrefdb_nel_lel_noael_loael_summary_AUG2014_FOR_PUBLIC_RELEASE.csv") 
+
+## read the csv toxcast dataset
+## "NULL" and blank cells, are reported as NA
+toxcast <- read.csv(file = toxcast_data, na.strings = c("NULL", "")) 
+```
+
+## Inspecting the data
+```{r}
+pander::pander(head(toxcast))
+
+## number of rows and variables: 11815 rows (observations) and 53 variables
+dim(toxcast)
+
+## names of variables in the dataset
+names(toxcast)
+
+## all names to lowercase, the first variable "x" (row number), was not in lowercase
+names(toxcast) <- tolower(names(toxcast))
+
+## information about the variables; factors, integers, numeric
+str(toxcast)
+```
+
+## Tidy the data
+The data is already tidy. Each variable has its own cell, each row has its own observation and each value has its own cell. All variable names are lowercase and snake_case. 
+
+## Complete cases
+In the dataset some cells are empty. Empty cells are reported as NA. Cells that say "NULL" are also reported as NA. A new dataset, toxcast_complete, is made where all missing values are removed.
+```{r}
+sum(is.na(toxcast)) ## 78301 missing values (blank cells or "NULL")
+
+## new dataset, where all missing values are removed
+toxcast_complete <- toxcast %>%
+  dplyr::mutate(complete_cases = complete.cases(.)) %>%
+  dplyr::filter(complete_cases == "TRUE") 
+
+pander::pander(head(toxcast_complete))
+
+dim(toxcast_complete) ## 1436 rows (observations) and 54 variables (complete cases = extra variable). 
+```
+
+## Selecting the data
+Some variables are selected from the toxcast_complete dataset. These variables will be used for the graphs. It is assumed that the LEL and the LOAEL are the same, therefore only the LEL is selected. The same applies for the NEL and the NOAEL, only the NEL is selected. The data will be selected from the toxcast_complete, where all missing values are removed. 
+```{r}
+toxcast_selected <- toxcast_complete %>%
+  dplyr::select(chemical_name, dose_unit, study_type, species, lel_dose, nel_dose)
+
+pander::pander(head(toxcast_selected))
+```
+
+## Checking levels of selected variables
+```{r}
+str(toxcast_selected)
+
+## Checking levels in variable dose_unit
+levels(toxcast_selected$dose_unit) ## LEL and NEL are given in two kind of units: mg/kg/day and ppm, but ppm is the same as mg/kg so the values are reported in the same unit. 
+
+## Replace ppm by mg/kg/day in the dose_unit variable
+toxcast_selected$dose_unit <- str_replace_all(toxcast_selected$dose_unit, 
+                               pattern = "ppm", 
+                               replacement = "mg/kg/day")
+
+## Checking levels dose_unit again
+levels(as.factor(toxcast_selected$dose_unit))
+
+## Checking levels in variable study_type
+levels(toxcast_selected$study_type) ## CHR = chronic/cancer; MGR = multigenerational reproductive; DEV = Prenatal developmental; SUB = Subchronic; SAC = Subacute
+
+## Checking levels in variable species
+levels(toxcast_selected$species)
+```
+
+## Creating new variable
+A new variable "nr" is created. "nr" can be used as replacement for chemical name, because the chemical names can be quite long and therefore it can be messy in a plot.
+```{r}
+toxcast_selected <- toxcast_selected %>%
+  dplyr::mutate(nr = row_number())
+```
+
+## Summarize the data
+The data is grouped by chemical_name and study_type. The mean, standard deviation, max and min of the lel_dose and the nel_dose are calculated. 
+```{r}
+toxcast_summary <- toxcast_selected %>%
+  dplyr::group_by(chemical_name, study_type) %>%
+  summarize(mean_lel_dose = mean(lel_dose),
+            sd_lel_dose = sd(lel_dose),
+            max_lel_dose = max(lel_dose),
+            min_lel_dose = min(lel_dose),
+            mean_nel_dose = mean(nel_dose),
+            sd_nel_dose = sd(nel_dose),
+            max_nel_dose = max(nel_dose),
+            min_nel_dose = min(nel_dose))
+  
+pander::pander(head(toxcast_summary))
+```
+
+## Exploratory data analysis
+The NEL was plotted against the LEL. Most chemicals that have a low NEL, also have a low LEL. A high NEL results most of the time in a high LEL. An exception is the chemical with a LEL of about 5000, this chemical has a relatively low NEL with a relatively high LEL.
+```{r}
+nel_vs_lel <- toxcast_selected %>%
+  ggplot(aes(x = nel_dose, y = lel_dose)) + 
+  geom_point(aes(colour = study_type)) +
+  geom_smooth(aes(colour = study_type), method = "lm", se = TRUE) + 
+  # geom_text(aes(label = chemical_name), hjust = 0, vjust = 0)
+  ggtitle("NEL dose plotted against the LEL dose") +
+  xlab("NEL dose (mg/kg/day)") +
+  ylab("LEL dose (mg/kg/day)")
+  
+nel_vs_lel
+```
+
+Which chemical has a high LEL and a relatively low NEL?
+The chemical is Etofenprox and the LEL is 5000 mg/kg/day and the NEL is 250 mg/kg/day for the study_type DEV: prenatal development. It was only tested on rats for DEV. The codes are shown below.
+```{r}
+## Chemical that has a low NEL and a relatively high LEL
+low_nel_high_lel <- toxcast_selected %>%
+  dplyr::filter((lel_dose >= 4500), (nel_dose <= 1000))
+
+low_nel_high_lel ## The chemical Etofenprox has a high LEL (5000 mg/kg/day) and a low NEL (250 mg/kg/day) for prenantal development (DEV) examined on rats. 
+
+
+## Was the toxicity of Etofenprox for DEV also tested on other animals?
+Etofenprox_DEV <- toxcast_selected %>%
+  dplyr::filter(study_type == "DEV") %>%
+  dplyr::filter(chemical_name == "Etofenprox")
+
+Etofenprox_DEV ## Etofenprox was only tested on rats for DEV.
+```
+
+Most chemicals that are tested have a low LEL and a low NEL. Therefore, the plot is filtered for a NEL lower than 1000 and the LEL lower than 2500. 
+
+Facets are added for the species: dog, hamster, mouse, rabbit, rat. The colours in the plot are for the study_type wherefore the toxicity of the chemicals was tested (CHR, DEV, MGR, SAC and SUB). 
+```{r}
+low_nel_vs_lel <- toxcast_selected %>%
+  dplyr::filter(nel_dose < 1000) %>%
+  dplyr::filter(lel_dose < 2500) %>%
+  ggplot(aes(x = nel_dose, y = lel_dose)) + 
+  geom_point(aes(colour = study_type)) +
+  geom_smooth(aes(colour = study_type), method = "lm", se = FALSE) +
+  facet_wrap(~ species) +
+  # geom_text(aes(label = chemical_name), hjust = 0, vjust = 0)
+  ggtitle("Filtered low NEL dose (< 1000) vs low LEL dose (< 2500)") +
+  xlab("NEL dose (mg/kg/day)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ylab("LEL dose (mg/kg/day)")
+
+  
+low_nel_vs_lel 
+```
+
+In the plot is shown that most studies were done on rats. To check the number of chemicals per study and animal, a bar plot was made below. 
+```{r}
+number_of_chemicals <- toxcast_selected %>%
+  dplyr::group_by(study_type, species) %>%
+  dplyr::summarise(number_of_chemicals = n()) %>%
+  ggplot(aes(x = study_type, y = number_of_chemicals)) +
+  geom_bar(aes(fill = species), stat = "identity", position = "dodge") +
+  ggtitle("Number of chemicals per study type and animal") +
+  xlab("Study type") +
+  ylab("Number of Chemicals")
+
+number_of_chemicals
+```
+
+The bar plot showed that most of the studies were done with rats. The study type MGR was only tested on rats. Rabbits were only used for testing the toxicity of chemicals for DEV. Compared to CHR, SAC and SUB, relatively much studies were done for DEV and MGR. Therefore, the data of the DEV and MGR studies will be filtered in the next plot.  
+
+## Filter data for DEV and MGR
+```{r}
+DEV_and_MGR <- toxcast_selected %>%
+  dplyr::filter(study_type == "DEV" | study_type == "MGR") %>%
+  ggplot(aes(x = nel_dose, y = lel_dose)) +
+  geom_point(aes(colour = species)) +
+  geom_smooth(aes(colour = species), method = "lm", se = FALSE) +
+  facet_wrap(~ study_type) +
+  # geom_text(aes(label = chemical_name), hjust = 0, vjust = 0)
+  ggtitle("NEL dose vs LEL dose for DEV and MGR") +
+  xlab("NEL dose (mg/kg/day)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ylab("LEL dose (mg/kg/day)")
+
+DEV_and_MGR
+```
+
+DEV will be further investigated, because this has the most dispersion and more animal types. A colour gradient is used to show the different lel_dose and nel_dose in the animals for the DEV study. 
+```{r}
+## colour gradient of the LEL dose for DEV
+fill_gradient_DEV_lel <- toxcast_selected %>%
+  filter(study_type == "DEV") %>%
+  ggplot(aes(x = lel_dose, y = nr)) +
+  geom_point(aes(colour = lel_dose)) +
+  scale_colour_gradient(low = "yellow", high = "blue") +
+  facet_wrap(~ species) +
+  # geom_text(aes(label = chemical_name), hjust = 0, vjust = 0)
+  ggtitle("LEL dose of chemicals for DEV and different species") +
+  xlab("LEL dose (mg/kg/day)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ylab("nr of chemical")
+
+fill_gradient_DEV_lel
+```
+
+In the plot is shown that a lot of chemicals have a low LEL. Therefore, the plot will be zoomed in for a LEL dose lower than 150 mg/kg/day. 
+```{r}
+## zoomed colour gradient of the LEL dose for DEV
+fill_gradient_DEV_lel_low <- toxcast_selected %>%
+  dplyr::filter(study_type == "DEV") %>%
+  dplyr::filter(lel_dose < 150) %>%
+  ggplot(aes(x = lel_dose, y = nr)) +
+  geom_point(aes(colour = lel_dose)) +
+  scale_colour_gradient(low = "yellow", high = "blue") +
+  facet_wrap(~ species) +
+  # geom_text(aes(label = chemical_name), hjust = 0, vjust = 0)
+  ggtitle("LEL dose (< 150 mg/kg/day) of chemicals for DEV and different species") +
+  theme(plot.title = element_text(size = 12)) +
+  xlab("LEL dose (mg/kg/day)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ylab("nr of chemical")
+
+fill_gradient_DEV_lel_low
+
+## For the NEL the same kind of plot was made, for a NEL lower than 150 mg/kg/day
+fill_gradient_DEV_nel_low <- toxcast_selected %>%
+  dplyr::filter(study_type == "DEV") %>%
+  dplyr::filter(nel_dose < 150) %>%
+  ggplot(aes(x = nel_dose, y = nr)) +
+  geom_point(aes(colour = nel_dose)) +
+  scale_colour_gradient(low = "yellow", high = "blue") +
+  facet_wrap(~species) +
+  # geom_text(aes(label = chemical_name), hjust = 0, vjust = 0)
+  ggtitle("NEL dose (< 150 mg/kg/day) of chemicals for DEV and different species") +
+  theme(plot.title = element_text(size = 12)) +
+  xlab("NEL dose (mg/kg/day)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ylab("nr of chemical")
+
+fill_gradient_DEV_nel_low
+
+# cowplot::plot_grid(fill_gradient_DEV_lel_low, fill_gradient_DEV_nel_low)
+```
+
+In the plot for the NEL dose are more chemicals present at the right (low dose) than with the LEL dose. This corresponds to the expectation because the NEL must be lower than the LEL. 
+
+A list of the most toxic chemicals for DEV are shown below. The most toxic chemical is the chemical with the lowest LEL dose, because this is the lowest effect level. A low NEL does not always results in a low LEL, so therefore the LEL is used for this list of most toxic chemicals for DEV.  
+```{r}
+most_toxic_chemicals <- toxcast_selected %>%
+  dplyr::filter(study_type == "DEV") %>%
+  dplyr::arrange(lel_dose)
+
+pander::pander(most_toxic_chemicals[1:50, ])
+```
+
+## Results
+First the NEL was plotted against the LEL. This graph showed the toxicity of a chemical within different study types. It shows that many chemicals have a low LEL and NEL. A few chemicals had a NEL higher than 1000 mg/kg/day and a LEL higher than 2500 mg/kg/day. One chemical had a relatively high LEL (5000 mg/kg/day) and a relatively low NEL (250 mg/kg/day). This chemical was Etofenprox for the study type DEV. It was tested on rats only. Because most chemicals have a low LEL and a low NEL, all chemicals were filtered for a LEL lower than 2500 mg/kg/day and a NEL lower than 1000 mg/kg/day. The following plots showed the toxicity of the chemical per species. The graphs showed on which study type the animal was tested. For most of the studies, rats were used for the examination. Rats were used for all study types. The other species were tested for a few chemicals and not for all study types. To check which animals were used for how many chemicals and for what study type, a bar graph was plotted. A lot of chemicals were tested for the study types DEV and MGR, therefore further investigation was done for these study types. The NEL was plotted against the LEL for the two study types. This showed that DEV was tested on three species (also seen in the bar plot) and that MGR was only tested on rats. Because there is more distribution in the data points of the DEV, this study type was used to examine the most toxic chemicals for prenatal development (DEV). In the plots the LEL dose was plotted against the chemicals. There were a lot of chemicals with a low LEL dose and therefore a zoomed plot was made for a LEL lower than 150 mg/kg/day. The NEL dose was also plotted against the chemicals. This showed that there were even more chemicals at the right side (low dose). This corresponds to the expectation, because the NEL should be lower than the LEL. To finish the investigation, a table was made with the 50 most toxic chemicals (lowest LEL) for prenatal development. 
+
+## Conclusion
+The aim of this project (capstone project) was to determine the toxicity of chemicals for different study types. The last table showed that Chlorophacinone is the most toxic chemical for the study type prenatal development. It has a LEL dose of 0.1 mg/kg/day (tested on rats). Chlorophacinone is for this study type very toxic, but could be less toxic for another study type. Further investigation needs to be done for the analysis of the toxicity of the chemicals in the other study types.

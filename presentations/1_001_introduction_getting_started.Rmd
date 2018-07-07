@@ -29,6 +29,7 @@ output:
 
 <div class="footer" style="margin-top;font-size:120%;"> 
 Data Analysis Using R - `r Sys.Date()` </div>
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, fig.width = 5, fig.height = 3)
 ```

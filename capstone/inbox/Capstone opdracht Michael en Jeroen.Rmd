@@ -1,0 +1,197 @@
+---
+title: "Capstone USpollution"
+author: "Michael Dekker en Jeroen Schipper"
+date: "02-02-2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Inleiding
+
+De dataset waar mee wordt gewerkt bevat gegevens over de luchtvervuiling in de VS en Mexico. Deze dataset bevat gegevens die verzameld zijn vanaf 01-01-2000 tot en met 31-03-2016.De gegevens zijn van de volgende stoffen: NO2, O3, SO2 en CO.  
+Verder bevat deze dataset ook de waardes van deze stoffen per staat, waarbij ook de county en soms de stad staan aangegeven waar deze metingen vandaan komen. 
+De belangrijkste waarde, waar het meest mee wordt gedaan is de AQI (Air Quality Index) waarde. Vanuit deze waardes is een gebied met een grote diversiteit in de waardes gekozen, in dit geval Mexico en is hier verder op in gegaan. 
+De dataset is verkregen vanaf deze site https://www.kaggle.com/sogun3/uspollution
+De data zelf is afkomstig van de USEPA (United States Environmental Protection Agency).
+Het hoofddoel is het uitzoeken in welke staat/stad een hoge spreiding in AQI waardes aanwezig is en welke stoffen de meeste spreiding bevatten.
+
+ 
+Root aanmaken
+```{r}
+require("rprojroot") || utils::install.packages("rprojroot")
+library(rprojroot)
+root <- find_root_file(criterion = is_rstudio_project)
+```
+
+Librarys die geladen moeten worden
+```{r}
+library(tidyverse)
+library(dplyr)
+```
+
+Bestands locatie definieren
+```{r}
+path_to_file <- file.path(root,
+                          "capstone",
+                          "data", 
+                          "uspollution",
+                          "uspollution.zip")
+path_to_output_dir <- file.path(root,
+                          "capstone",
+                          "data", 
+                          "uspollution")
+```
+
+Uspollution bestand unzippen
+```{r}
+unzip(path_to_file, exdir = path_to_output_dir)
+```
+
+Inlezen van het uspollution bestand
+```{r}
+uspollution <- readr::read_delim(file = file.path(root, "capstone", "data", "uspollution", "pollution_us_2000_2016.csv"), delim = ",")
+```
+
+Het checken van het aantal rijen, aantal variabelen, namen van de variabelen en data type van de variabelen.
+```{r}
+head(uspollution)
+nrow(uspollution)
+ncol(uspollution)
+names(uspollution)
+sapply(uspollution, class)
+```
+
+Samenvatting van de dataset, met hierin het betrouwbaarheidsinterval, maximum, minimum, gemiddelde en mediaanwaarden
+```{r}
+summary(uspollution)
+```
+
+Code om de data type van alle variabelen te checken.
+```{r}
+sapply(uspollution, class)
+```
+
+Het omzetten van de variabelen namen naar variabelen namen met alleen kleine letters, snake case en korte omschrijvende namen 
+```{r}
+names(uspollution)
+
+names(uspollution) <- tolower(names(uspollution))
+names(uspollution) <- stringr::str_replace_all(names(uspollution), pattern = " ",
+                                                                  replacement = "_")
+
+names(uspollution)
+```
+
+Het omzetten van de data naar een tidy dataframe
+```{r}
+uspollution_tidy <- uspollution %>% mutate(day = format(date_local, "%d"), 
+                                           month = format(date_local, "%m"), 
+                                           year = format(date_local, "%Y")) %>% 
+ group_by (day, month, year)
+```
+
+Verwijderen van voor de opdracht niet gebruikte data
+```{r}
+uspollution_clean <- uspollution_tidy %>% select(state, county, city, date_local, no2_aqi, o3_aqi, so2_aqi, co_aqi)
+```
+
+Het verwijderen van alle NA's in de dataset
+```{r}
+uspollution_no_na <- uspollution_clean %>%
+  na.omit()
+
+summary(uspollution_no_na)
+```
+
+Boxplot van alle Air Quality Indexes can alle geteste staten.
+```{r}
+plot_us_no2 <- ggplot(data = uspollution_no_na, aes(x = state, y = no2_aqi)) +
+  geom_boxplot() +
+  theme(axis.text.x=element_text(angle=90, hjust=1)) +
+  labs(title="NO2 Air Quality Index of all tested states",
+       x ="State",
+       y = "NO2 Aqi")
+
+plot_us_o3 <- ggplot(data = uspollution_no_na, aes(x = state, y = o3_aqi)) +
+  geom_boxplot() +
+  theme(axis.text.x=element_text(angle=90, hjust=1)) +
+  labs(title="O3 Air Quality Index of all tested states",
+       x ="State",
+       y = "O3 Aqi")
+
+plot_us_so2 <- ggplot(data = uspollution_no_na, aes(x = state, y = so2_aqi)) +
+  geom_boxplot() +
+  theme(axis.text.x=element_text(angle=90, hjust=1)) +
+  labs(title="SO2 Air Quality Index of all tested states",
+       x ="State",
+       y = "SO2 Aqi")
+
+plot_us_co <- ggplot(data = uspollution_no_na, aes(x = state, y = co_aqi)) +
+  geom_boxplot() +
+  theme(axis.text.x=element_text(angle=90, hjust=1)) +
+  labs(title="CO Air Quality Index of all tested states",
+       x ="State",
+       y = "CO Aqi")
+
+
+plot_us_no2
+plot_us_o3
+plot_us_so2
+plot_us_co
+```
+
+Plot met de alle Air Quality Indexes van de Country of Mexico.
+```{r}
+uspollution_com <- uspollution_no_na %>% filter(state == 'Country Of Mexico')
+
+plot_com <- ggplot(data = uspollution_com) +
+  geom_smooth(aes(x = date_local, y = no2_aqi, colour = "NO2")) +
+  geom_smooth(aes(x = date_local, y = o3_aqi, colour = "O3")) +
+  geom_smooth(aes(x = date_local, y = so2_aqi, colour = "SO2")) +
+  geom_smooth(aes(x = date_local, y = co_aqi, colour = "CO")) +
+  labs(title="Country of Mexico Air Quality Index throughout the whole measurement time",
+        x ="Local date", y = "AQI", colour = "AQI type")
+
+plot_com
+```
+
+Plot met de Air Quality Indexes voor NO2 en CO voor alle geteste steden in de Country of Mexico.
+```{r}
+plot_com_no2 <- ggplot(data = uspollution_com) +
+  geom_smooth(aes(x = date_local, y = no2_aqi, colour = city)) +
+  labs(title="Country of Mexico NO2 Air Quality Index per city",
+        x ="Local date", y = "AQI", colour = "City", colour = "City")
+
+plot_com_co <- ggplot(data = uspollution_com) +
+  geom_smooth(aes(x = date_local, y = co_aqi, colour = city)) +
+  labs(title="Country of Mexico CO Air Quality Index per city",
+        x ="Local date", y = "AQI", colour = "City", colour = "City")
+
+plot_com_no2
+plot_com_co
+```
+
+
+#Resultaten
+
+In de gevormde boxplots staat de waarde van het element afgezet tegen de staat waar deze waarde is gemeten. Hiermee is dus een duidelijk overzicht gecreeerd van hoeveel elk stof voorkomt per staat. Elke stof heeft z'n eigen plot.  
+Uit de plots (en data) is af te leiden dat alle stoffen een AQI waarde van tussen de 0 en 218 hebben. In de VS is een AQI van 0-50 goed en 51-100 matig. Vanaf 101-150 is het gevaarlijk voor de gevoelige (groepen) mensen, zoals mensen met astma of andere longproblemen. Vanaf 151 is er sprake van ongezond en vanaf 201 is er spraken van erg ongezond. Dit betekent dat tijdens de metingen de AQI van sommige sotffen in sommige staten duidelijk (veel) te hoog lag.  
+
+De boxplots laten zien dat de Country Of Mexico een zeer hoge spreiding laat zien in de NO2 AQI. Voor de O3 AQI is dit het geval in District of Columbia. Voor SO2 is de AQI met de hoogste spreiding Indiana. Country of Mexico laat ook de hoogste spreiding in de CO AQI zien.
+Omdat Country of Mexico de hoogste spreiding laat zien in twee verschillende AQI's is er voor gekozen om hier verder naar te kijken. De grafiek 'Country of Mexico Air Quality Index throughout the whole measurement time' laat zien dat in 2009 de NO2 AQI en CO AQI zeer omhoog zijn gegaan. Hier is verder naar gekeken.
+Door naar de NO2 AQI van Country of Mexico per stad te kijken is te zien dat de grote spreiding voornamelijk wordt veroorzaakt door Mexicali, deze stad laat in 2009 een zeer hoge AQI zien, bijna net zo hoog als de begin status in 2006. Ook Tijuana draagt hieraan bij terwijl Rosarito tamelijk stabiel blijft.
+De CO2 AQI van Country of Mexico per stad laat zien dat ook hier Mexicali de groot spreiding veroorzaakt. Ook hier draagt Tijuana lichtelijk bij aan de spreiding, maar lang niet zo ver als de NO2 AQI. Ook hier is Rosarito de stad die de minste spreiding veroorzaakt.
+
+
+#Conclusie
+
+Mexicali is een van de steden met de grootste spreiding wat betreft CO en NO2. Uit de gegevens van de dataset valt te concluderen dat de luchtvervuiling in de loop der jaren sterk is afgenomen. Hierdoor is dus ook duidelijk dat de spreiding flink omlaag is gegaan. Ook is duidelijk dat SO2 en O3 de stoffen zijn die het meest voor vervuiling zorg(d)en (hadden de hoogste waardes en zijn het minste gedaald). 
+Voor vervolg onderzoek met deze dataset is het van belang om de stoffen die voor luchtvervuiling zorgen, die nu niet zijn meegenomen te analyseren.   
+
+
+
+ 
+

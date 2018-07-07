@@ -1,0 +1,335 @@
+---
+title: "Eindproject David + Harold"
+author: "David"
+date: "2 februari 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+In dit project wordt gewerkt met een toxcast database. In deze databse staat allerelei informatie over het effect van bepaalde chemsiche stoffen op bepaalde organismen. Het effect wordt weergegeven aan de hand van de maximale of minimale dosis waarbij er wel/geen effect te zien is. De databse bevat heel veel observaties en variabelen en het is in dit verslag de bedoeling daar iets uttigs uit te halen. Het doel in dit verslag is om de dataset eerst tidy te maken, dus overbodige informatie, of informatie die niet goed is wordt verwijderd. Vervolgens wordt er gekeken naar het effect van het aantal dagen/weken die er is toegeveogd van bepaalde chemische klassen van stoffen op de hdt. Dit verslag is door twee mensen gemaakt, Harold en David. Het eerste deel bevat het onderzoek van David, de tweede het onderzoek van Harold. Beide komen op hetzelfde neer qua uitslag, echter het is beide wat anders geprogrammeerd. 
+
+```{r setup2, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+library(rprojroot)
+root <- find_root_file(criterion = is_rstudio_project)
+root
+```
+
+```{r}
+##dataset toxcast inlezen in R
+path_to_mondial <- file.path(root, "capstone", "data", "toxcast", "toxrefdb_nel_lel_noael_loael_summary_AUG2014_FOR_PUBLIC_RELEASE.csv")
+mondial <- read_csv(path_to_mondial)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+## selecteren data van usability op 1 en 2, omdat deze bruikbaar zijn(zie het word document)
+tox_0.1 <-  filter(mondial, mondial$usability == c(1:2))
+tox_0.1
+```
+
+```{r}
+##bekijken hoeveel unieke variableen in de kolom "usability" zitten, na het tidy te hebben gemaakt op 1 en 2.
+unique(tox_0.1$usability)
+```
+
+```{r}
+## belangrijke kolommen geselecteerd em zo de dataset tidy grmaakt. Usability is eruit gehaald, deze is nu niet meer relevant. lel_dose is toegevoegd omdat ik deze wil gebruiken voor mijn grafiek, de andere zijn erin omdat deze ons relevant leken. 
+tox_0.2 <- tox_0.1[,c("entry_status_id","species_id", "species", "admin_route", "admin_method", "dose_start", "dose_start_unit", "dose_end", "dose_end_unit", "dose_unit", "purity", "lel_dose", "chemical_name", "chemical_sets", "hdt", "ldt")]
+
+tox_0.2
+```
+
+```{r}
+##tidy maken op entry status, zodat alleen een entry status van 1 mee gewerkt gaat worden.
+tox_0.3 <-  filter(tox_0.2, tox_0.2$entry_status_id == 1)
+tox_0.3
+```
+
+
+
+```{r}
+## check hoeveel variabelen de kolom entry status bevat, nadat deze op 1 is tidy gemaakt
+unique(tox_0.3$entry_status_id)
+```
+
+
+```{r}
+##check hoeveel diersoorten er nog over zijn na het tidy maken
+unique(tox_0.3$species)
+```
+Er wordt naar de muis en de hond onderzoek gedaan door David Vos, vervolgens doet Harold van Veldhuizen dit voor de rat en het konijn.
+```{r}
+##dataset voor muis maken
+tox_0.3_mouse <-  filter(tox_0.3, tox_0.3$species == "mouse")
+tox_0.3_mouse 
+```
+
+```{r}
+##dataset voor hond maken
+tox_0.3_dog <-  filter(tox_0.3, tox_0.3$species == "dog")
+##alleen oral toegediend erin(hiervan is het merendeel namelijk)
+tox_0.3_dog <- filter(tox_0.3_dog, tox_0.3_dog$admin_route == "Oral")
+tox_0.3_dog
+
+```
+
+```{r}
+##dataset voor muis maken
+tox_0.3_mouse <-  filter(tox_0.3, tox_0.3$species == "mouse")
+##alleen oral toegediend erin(hiervan is het merendeel namelijk)
+tox_0.3_mouse <- filter(tox_0.3_mouse, tox_0.3_mouse$admin_route == "Oral")
+tox_0.3_mouse
+```
+
+
+
+```{r}
+## install.packages("tidyverse")
+library(tidyverse)
+```
+
+
+
+Doel: aantal dagen/weken/maanden/jaren (premating)  toegediend (dus dose_end in dagen/weken uitzetten tegenover de hdt, voor hond en muis.
+
+```{r}
+##bekijken hoeveel soorten er zijn van dose_end_unit, zodat bepaald kan worden welke gekozen moet worden
+ggplot(data = tox_0.3_mouse) + 
+  geom_bar(mapping = aes(x = dose_end_unit))
+```
+
+
+```{r}
+##we kiezen week, omdat hiervan de meeste data is en dit zal het mooiste een grafiek weergeven
+tox_0.3_mouse_week <- filter(tox_0.3_mouse, tox_0.3_mouse$dose_end_unit == "week")
+tox_0.3_mouse_week
+```
+
+
+```{r}
+ggplot(data = tox_0.3_mouse_week) + 
+  geom_point(mapping = aes(x = dose_end, y = hdt))
+```
+
+In deze grafiek is te zien dat er niet echt een duidelijke conclusie te trekken is uit het verband tussen de dose_end en de hdt.
+
+
+```{r}
+##nieuwe grafiek, met extra groep, namelijk chemical sets
+grafiek_muis <- ggplot(data = tox_0.3_mouse_week) + 
+  geom_point(mapping = aes(x = dose_end, y = hdt, color = chemical_sets))
+
+muis_laatste <- grafiek_muis + ggtitle("Invloed lengte toediening op de hdt van de muis") + xlab("weken toegediend") + ylab("hoogte van de dosis (mg/kg/dag)")
+
+muis_laatste
+                           
+```
+
+
+
+
+```{r}
+##zelfde verhaal voor de hond, ook hier eerst sorteren op week
+tox_0.3_dog_week <- filter(tox_0.3_dog, tox_0.3_dog$dose_end_unit == "week")
+tox_0.3_dog_week
+
+```
+
+```{r}
+##eindgrafiek voor hond maken
+grafiek_hond <- ggplot(data = tox_0.3_dog_week) + 
+  geom_point(mapping = aes(x = dose_end, y = hdt, color = chemical_sets))
+
+hond_laatste <- grafiek_hond + ggtitle("Invloed lengte toediening op de hdt van de hond") + xlab("weken toegediend") + ylab("hoogte van de dosis (mg/kg/dag)")
+
+hond_laatste
+```
+        
+
+Harold heeft in de hieronder staande code het effect onderzocht van de genoemde chemicalien sets op ratten en konijnen. eigenlijk gaat het hier om bij welke dosis er nog net geen effect optreed in het nageslacht.
+
+
+```{r}
+## verwerking van enkel rabbit en rat (wordt dus nieuw tabel met enkel rabbit en rat)
+
+tox_rabbit_rat <- subset(tox_0.3, tox_0.3$species_id == c(1,3))
+tox_rabbit_rat
+```
+
+```{r}
+##verdere cleanup van tox_rabbit_rat hier kijken we naar het het effect over een generatie met orale toediening
+unique(tox_rabbit_rat$admin_route)
+##^hieruit bleek dat er hoofdletters in zaten :( 
+## vernietegen van hoofdletters
+tox_rabbit_rat$admin_route <- tolower(tox_rabbit_rat$admin_route)
+
+tox_rabbit_rat$chemical_name <- tolower(tox_rabbit_rat$chemical_name)
+
+tox_rabbit_rat$chemical_sets <- tolower(tox_rabbit_rat$chemical_sets)
+
+tox_rabbit_rat_oral <- subset(tox_rabbit_rat, tox_rabbit_rat$admin_route == "oral")
+
+tox_rabbit_rat_oral_gen <- subset(tox_rabbit_rat_oral, tox_rabbit_rat_oral$dose_end_unit == "generation")
+
+unique(tox_rabbit_rat_oral_gen$species_id)
+##bij rabbit gebruiken ze GD (Draag tijd vanaf bevruchting tot geboorte) dus nu enkel rat kijken konijn later
+
+tox_rat_oral_gen <- tox_rabbit_rat_oral_gen
+
+unique(tox_rat_oral_gen$dose_end)
+## enkel met dose end 2 selecteren om resultaten beetje het zelfde te houden
+tox_rat_oral_gen_0.1 <- subset(tox_rat_oral_gen, tox_rat_oral_gen$dose_end == 2)
+unique(tox_rat_oral_gen_0.1$dose_end)
+
+
+```
+
+```{r}
+##verder subsetten
+tox_rat_oral_gen_0.2 <- tox_rat_oral_gen_0.1[,c("species", "ldt","hdt", "dose_unit","dose_start", "dose_start_unit", "chemical_name", "chemical_sets")]
+tox_rat_oral_gen_0.2
+
+##ze hebben niet allemaal de zelfde naam moeten we even veranderen
+unique(tox_rat_oral_gen_0.2$dose_start_unit)
+tox_rat_oral_gen_0.2[tox_rat_oral_gen_0.2=="days (premating)"] <- "days"
+tox_rat_oral_gen_0.2[tox_rat_oral_gen_0.2=="day"] <- "days"
+tox_rat_oral_gen_0.2[tox_rat_oral_gen_0.2=="weeks (premating)"] <- "weeks"
+tox_rat_oral_gen_0.2[tox_rat_oral_gen_0.2=="week"] <- "weeks"
+##nu enkel nog maar days en weeks over
+
+tox_rat_oral_gen_0.2_days <- subset(tox_rat_oral_gen_0.2, tox_rat_oral_gen_0.2$dose_start_unit == "days")
+tox_rat_oral_gen_0.2_weeks <- subset(tox_rat_oral_gen_0.2, tox_rat_oral_gen_0.2$dose_start_unit == "weeks")
+##nu 2 subsetjes van de data wat betreft weeks en days
+```
+
+```{r}
+##order op dose start
+tox_rat_oral_gen_0.2_days <-  tox_rat_oral_gen_0.2_days[order(tox_rat_oral_gen_0.2_days$dose_start),]
+tox_rat_oral_gen_0.2_days
+tox_rat_oral_gen_0.2_weeks <- tox_rat_oral_gen_0.2_weeks[order(tox_rat_oral_gen_0.2_weeks$dose_start),]
+tox_rat_oral_gen_0.2_weeks
+ggplot() +
+    geom_point(aes(tox_rat_oral_gen_0.2_days$hdt, tox_rat_oral_gen_0.2_days$dose_start)) +
+    geom_point(aes(tox_rat_oral_gen_0.2_days$ldt, tox_rat_oral_gen_0.2_days$dose_start))
+```
+
+```{r}
+##data van weeks en die van days bij elkaar gedaan, hier staat de x as voor weeks nog in weeks
+ggplot() +
+    geom_point(data= tox_rat_oral_gen_0.2_days, aes(tox_rat_oral_gen_0.2_days$dose_start, tox_rat_oral_gen_0.2_days$hdt), colour= "blue", alpha= 1) +
+    geom_point(data= tox_rat_oral_gen_0.2_days, aes(tox_rat_oral_gen_0.2_days$dose_start, tox_rat_oral_gen_0.2_days$ldt), colour="red", alpha= 1) +
+    geom_point(data=tox_rat_oral_gen_0.2_weeks, aes(tox_rat_oral_gen_0.2_weeks$dose_start, tox_rat_oral_gen_0.2_weeks$hdt), colour= "yellow", alpha= 1) +
+    geom_point(data=tox_rat_oral_gen_0.2_weeks, aes(tox_rat_oral_gen_0.2_weeks$dose_start, tox_rat_oral_gen_0.2_weeks$ldt), colour= "purple", alpha= 1)
+
+```
+
+```{r}
+##data van de weeks subset uitgezet
+ggplot() +
+  geom_point(data=tox_rat_oral_gen_0.2_weeks, aes(tox_rat_oral_gen_0.2_weeks$dose_start_days, tox_rat_oral_gen_0.2_weeks$hdt), colour= "black", alpha= .1) + geom_jitter(aes(tox_rat_oral_gen_0.2_weeks$dose_start_days, tox_rat_oral_gen_0.2_weeks$hdt), colour= "black", alpha= .8)
+```
+
+```{r}
+#extra colom van weken naar dagen
+tox_rat_oral_gen_0.2_weeks$dose_start_days <- tox_rat_oral_gen_0.2_weeks$dose_start * 7
+#vernietegen laatste waarde (uitbeiter)
+tox_rat_oral_gen_0.3_weeks <-  tox_rat_oral_gen_0.2_weeks[-nrow(tox_rat_oral_gen_0.2_weeks),]
+```
+
+
+
+```{r}
+##weeks en days over elkaar heen dit zorgt voor ruimweg zelfde data
+dose_hoogte_vs_dose_start <- ggplot() +
+  geom_point(data=tox_rat_oral_gen_0.3_weeks, aes(tox_rat_oral_gen_0.3_weeks$dose_start_days, tox_rat_oral_gen_0.3_weeks$hdt), colour= "blue", alpha= .5) + 
+  geom_jitter(aes(tox_rat_oral_gen_0.3_weeks$dose_start_days, tox_rat_oral_gen_0.3_weeks$hdt), colour= "black", alpha= .8) + 
+  geom_point(data= tox_rat_oral_gen_0.2_days, aes(tox_rat_oral_gen_0.2_days$dose_start, tox_rat_oral_gen_0.2_days$hdt), colour= "blue", alpha= .1) +
+  geom_jitter(aes(tox_rat_oral_gen_0.2_days$dose_start, tox_rat_oral_gen_0.2_days$hdt), alpha= .6)
+
+dose_hoogte_vs_dose_start + ggtitle("ratten") + xlab("dagen premating toegediend") + ylab("hoogte van de dosis (mg/kg/dag)")
+
+```
+
+```{r}
+ 
+dose_hoogte_vs_dose_start_1.2 <- ggplot()+
+    geom_jitter(data = tox_rat_oral_gen_0.2_days, aes(tox_rat_oral_gen_0.2_days$dose_start, tox_rat_oral_gen_0.2_days$hdt, color= chemical_sets), alpha= 1)
+
+dose_hoogte_vs_dose_start_1.3 <- ggplot()+
+    geom_point(data = tox_rat_oral_gen_0.2_days, aes(tox_rat_oral_gen_0.2_days$dose_start, tox_rat_oral_gen_0.2_days$hdt, color= chemical_sets), alpha= 1)
+
+rat_eind <- dose_hoogte_vs_dose_start_1.2 + ggtitle("ratten") + xlab("dagen premating toegediend") + ylab("hoogte van de dosis (mg/kg/dag)")
+
+rat_eind_.2 <- dose_hoogte_vs_dose_start_1.3 + ggtitle("ratten") + xlab("dagen premating toegediend") + ylab("hoogte van de dosis (mg/kg/dag)")
+```
+
+
+```{r}
+###########################################
+# NU VERDER MET KONIJN ZELFDE VERHAAL ISH #
+###########################################
+```
+
+
+```{r}
+##subsetten op enkel rabbit
+tox_rabbit <- subset(tox_rabbit_rat, tox_rabbit_rat$species == "rabbit")
+##subsetten op enkel oral
+tox_rabbit_oral <- subset(tox_rabbit, tox_rabbit$admin_route == "oral")
+##verder subsetten
+tox_rabbit_oral_0.1 <- tox_rabbit_oral[,c("species", "ldt","hdt", "dose_unit","dose_start", "dose_start_unit", "chemical_name", "chemical_sets")]
+tox_rabbit_oral_0.1
+##GD naar gd (tidydata)
+tox_rabbit_oral_0.1[tox_rabbit_oral_0.1=="GD"] <- "gd"
+unique(tox_rabbit_oral_0.1$dose_start_unit)
+##sorteren data op toenemende dose_start
+tox_rabbit_oral_0.2_GD <-  tox_rabbit_oral_0.1[order(tox_rabbit_oral_0.1$dose_start),]
+tox_rabbit_oral_0.2_GD
+#hdt uitzetten tegen over dose_start
+ggplot()+
+    geom_point(data = tox_rabbit_oral_0.2_GD, aes(tox_rabbit_oral_0.2_GD$hdt, tox_rabbit_oral_0.2_GD$dose_start), colour= "red")
+
+```
+
+```{r}
+#hdt uitzetten tegen over dose_start
+dose_hoogte_vs_dose_start_rabbit <- ggplot()+
+    geom_jitter(data = tox_rabbit_oral_0.2_GD, aes(tox_rabbit_oral_0.2_GD$dose_start, tox_rabbit_oral_0.2_GD$hdt, color= chemical_sets), alpha= 1)
+
+rabbit_eind <- dose_hoogte_vs_dose_start_rabbit + ggtitle("konijnen") + xlab("dagen premating toegediend") + ylab("hoogte van de dosis (mg/kg/dag)")
+
+```
+
+```{r}
+rabbit_eind
+rat_eind
+muis_laatste
+hond_laatste
+```
+
+results:
+interesant is te zien dat de data niet heel bvijzonder verschillend is wat betreffend de (6 en 7) premating toegediend wel is duidelijk te zien dat de set "phase1v1;phase1v2;tox21" het meest is getest waardoor deze ook een mooi resultaat laat zien. dit effect is hetzelfde wanneer men kijkt naar de ratten. bij ratten valt er op dat er duidelijk 1 optima is wat betreft maximaal toedienbare dosis op x dagen premating toegediend waarbij er nog geen effect is te ziern op de daarop volgende generatie.
+
+conclusion:
+het optima wat betreft ratten ligt zo rond de 70 dagen premating toegedoen qua konijnen ligt dit rond de 7 dagen. zelf zou ik ervoor plijten om nog meer testen te doen wat betreft konijnen om te kijken of er ergens een duidelijk optima ligt. ook zou er voor beide kunnen worden gekeken of er nog verschillende effecten zijn wanneer er per chemische stof wordt gekeken.
+
+In de grafiek "invloed lengte toediening op de hdt van de muis" & "invloed lengte toediening op de hdt van de hond" is te zien dat er niet echt een duidelijke conclusie te trekken is uit het verband tussen de dose_end en de hdt.
+
+

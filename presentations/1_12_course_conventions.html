@@ -10,7 +10,7 @@
 
 
 
-  <meta name="date" content="2018-01-25" />
+  <meta name="date" content="2018-07-07" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -94,7 +94,7 @@
       <h1 data-config-title><!-- populated from slide_config.json --></h1>
       <h2 data-config-subtitle><!-- populated from slide_config.json --></h2>
       <p data-config-presenter><!-- populated from slide_config.json --></p>
-            <p style="margin-top: 6px; margin-left: -2px;">2018-01-25</p>
+            <p style="margin-top: 6px; margin-left: -2px;">2018-07-07</p>
           </hgroup>
   </slide>
 
@@ -119,7 +119,7 @@
 </style>
 
 <div class="footer" style="margin-top;font-size:120%;">
-Using R in Life Sciences - January 2018</div>
+Data Analysis Using R - 2018-07-07</div>
 
 <slide class=""><hgroup><h2>Code Style</h2></hgroup><article  id="code-style">
 
@@ -137,14 +137,18 @@ Using R in Life Sciences - January 2018</div>
 
 <pre class = 'prettyprint lang-r'>library(tidyverse)</pre>
 
-<pre >## -- Attaching packages ------------------------------------------------------------------ tidyverse 1.2.1 --</pre>
+<pre >## -- Attaching packages -------------------------------------------------- tidyverse 1.2.1 --</pre>
 
-<pre >## v ggplot2 2.2.1     v purrr   0.2.4
-## v tibble  1.4.1     v dplyr   0.7.4
-## v tidyr   0.7.2     v stringr 1.2.0
-## v readr   1.1.1     v forcats 0.2.0</pre>
+<pre >## v ggplot2 3.0.0     v purrr   0.2.5
+## v tibble  1.4.2     v dplyr   0.7.6
+## v tidyr   0.8.1     v stringr 1.3.1
+## v readr   1.1.1     v forcats 0.3.0</pre>
 
-<pre >## -- Conflicts --------------------------------------------------------------------- tidyverse_conflicts() --
+<pre >## Warning: package &#39;ggplot2&#39; was built under R version 3.5.1</pre>
+
+<pre >## Warning: package &#39;dplyr&#39; was built under R version 3.5.1</pre>
+
+<pre >## -- Conflicts ----------------------------------------------------- tidyverse_conflicts() --
 ## x dplyr::filter() masks stats::filter()
 ## x dplyr::lag()    masks stats::lag()</pre>
 
@@ -156,11 +160,11 @@ table</pre>
 <pre >## # A tibble: 5 x 2
 ##   a_is_a_variable b_is_another_variable
 ##             &lt;int&gt;                 &lt;dbl&gt;
-## 1               1                -1.38 
-## 2               2                -0.782
-## 3               3                 0.333
-## 4               4                 0.932
-## 5               5                 1.59</pre>
+## 1               1                1.70  
+## 2               2               -0.147 
+## 3               3                1.12  
+## 4               4               -0.0152
+## 5               5               -1.22</pre>
 
 </article></slide><slide class=""><hgroup><h2>Variables</h2></hgroup><article  id="variables">
 
@@ -271,11 +275,11 @@ table</pre>
 <pre >## # A tibble: 5 x 4
 ##   a_is_a_variable b_is_another_variable mean_new sd_new
 ##             &lt;int&gt;                 &lt;dbl&gt;    &lt;dbl&gt;  &lt;dbl&gt;
-## 1               1                -1.38     0.139   1.22
-## 2               2                -0.782    0.139   1.22
-## 3               3                 0.333    0.139   1.22
-## 4               4                 0.932    0.139   1.22
-## 5               5                 1.59     0.139   1.22</pre>
+## 1               1                1.70      0.287   1.14
+## 2               2               -0.147     0.287   1.14
+## 3               3                1.12      0.287   1.14
+## 4               4               -0.0152    0.287   1.14
+## 5               5               -1.22      0.287   1.14</pre>
 
 </article></slide><slide class=""><hgroup><h2>Combining datatables</h2></hgroup><article  id="combining-datatables">
 
@@ -297,11 +301,11 @@ table_2</pre>
 <pre >## # A tibble: 5 x 5
 ##   id        a_is_a_variable b_is_another_variable mean_new sd_new
 ##   &lt;chr&gt;               &lt;int&gt;                 &lt;dbl&gt;    &lt;dbl&gt;  &lt;dbl&gt;
-## 1 1_table_2               7                -1.21      9.00 -0.352
-## 2 2_table_2               8                 0.277     9.00 -0.352
-## 3 3_table_2               9                 1.08      9.00 -0.352
-## 4 4_table_2              10                -2.35      9.00 -0.352
-## 5 5_table_2              11                 0.429     9.00 -0.352</pre>
+## 1 1_table_2               7                -1.21         9 -0.352
+## 2 2_table_2               8                 0.277        9 -0.352
+## 3 3_table_2               9                 1.08         9 -0.352
+## 4 4_table_2              10                -2.35         9 -0.352
+## 5 5_table_2              11                 0.429        9 -0.352</pre>
 
 </article></slide><slide class=""><hgroup><h2>Adding an identifier to the first table</h2></hgroup><article  id="adding-an-identifier-to-the-first-table">
 
@@ -315,11 +319,11 @@ table</pre>
 <pre >## # A tibble: 5 x 5
 ##   id      a_is_a_variable b_is_another_variable mean_new sd_new
 ##   &lt;chr&gt;             &lt;int&gt;                 &lt;dbl&gt;    &lt;dbl&gt;  &lt;dbl&gt;
-## 1 1_table               1                -1.38     0.139   1.22
-## 2 2_table               2                -0.782    0.139   1.22
-## 3 3_table               3                 0.333    0.139   1.22
-## 4 4_table               4                 0.932    0.139   1.22
-## 5 5_table               5                 1.59     0.139   1.22</pre>
+## 1 1_table               1                1.70      0.287   1.14
+## 2 2_table               2               -0.147     0.287   1.14
+## 3 3_table               3                1.12      0.287   1.14
+## 4 4_table               4               -0.0152    0.287   1.14
+## 5 5_table               5               -1.22      0.287   1.14</pre>
 
 </article></slide><slide class=""><hgroup><h2>Now we bind the two together</h2></hgroup><article  id="now-we-bind-the-two-together">
 
@@ -334,16 +338,16 @@ table</pre>
 <pre >## # A tibble: 10 x 5
 ##    id        a_is_a_variable b_is_another_variable mean_new sd_new
 ##    &lt;chr&gt;               &lt;int&gt;                 &lt;dbl&gt;    &lt;dbl&gt;  &lt;dbl&gt;
-##  1 1_table                 1                -1.38     0.139  1.22 
-##  2 2_table                 2                -0.782    0.139  1.22 
-##  3 3_table                 3                 0.333    0.139  1.22 
-##  4 4_table                 4                 0.932    0.139  1.22 
-##  5 5_table                 5                 1.59     0.139  1.22 
-##  6 1_table_2               7                -1.21     9.00  -0.352
-##  7 2_table_2               8                 0.277    9.00  -0.352
-##  8 3_table_2               9                 1.08     9.00  -0.352
-##  9 4_table_2              10                -2.35     9.00  -0.352
-## 10 5_table_2              11                 0.429    9.00  -0.352</pre>
+##  1 1_table                 1                1.70      0.287  1.14 
+##  2 2_table                 2               -0.147     0.287  1.14 
+##  3 3_table                 3                1.12      0.287  1.14 
+##  4 4_table                 4               -0.0152    0.287  1.14 
+##  5 5_table                 5               -1.22      0.287  1.14 
+##  6 1_table_2               7               -1.21      9     -0.352
+##  7 2_table_2               8                0.277     9     -0.352
+##  8 3_table_2               9                1.08      9     -0.352
+##  9 4_table_2              10               -2.35      9     -0.352
+## 10 5_table_2              11                0.429     9     -0.352</pre>
 
 </article></slide><slide class=""><hgroup><h2>Data Governance</h2></hgroup><article  id="data-governance">
 

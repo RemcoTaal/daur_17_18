@@ -1,0 +1,445 @@
+---
+title: "Capstone assignment Toxcast Emilie en Floris"
+author: "Floris Leegwater en Emilie Bakker"
+date: "01-02-2018"
+output:
+  slidy_presentation:
+    highlight: pygments
+  ioslides_presentation:
+    highlight: pygments
+    logo: D:/r_projects/hp_r_course/images/Logo INT_GOOD VERSION_VECTORS.png
+    widescreen: yes
+---
+<style>
+
+.footer {
+    font-size: 16pt;
+    color: Black;
+    font-family: 'Helvetica'
+    content: attr(label);
+    position: absolute;
+    margin-left: auto;
+    margin-right: auto;
+    left: 0;
+    right: 0;
+    text-align:center;
+    bottom: 10px;
+    line-height: 1.9;
+    display: block;
+}
+
+</style>
+
+<div class="footer" style="margin-top;font-size:120%;"> 
+Data Analysis Using R - November 2017 </div>
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.width = 5, fig.height = 3,
+                      message = FALSE, error = FALSE, warning = FALSE)
+```
+
+```{r, root_1, include=FALSE}
+## defines the root of the project for later use
+require("rprojroot") || utils::install.packages("rprojroot")
+library(rprojroot)
+root <- find_root_file(criterion = is_rstudio_project)
+```
+
+## Capstone definition
+
+ - A coping stone :coping
+ - The high point :crowning achievement
+
+"..the capstone of her career.."
+
+```{r, out.width="300px", echo=FALSE, eval=FALSE}
+knitr::include_graphics(path = file.path(root, "images", "keystone.gif"))
+```
+
+## Capstone in this course
+
+ - A showcase that you've learned how to use R in _every_ element of the data cycle
+ - No statistical analysis
+ - Focus on read, clean and explore data
+ - Final product: An \*.Rmd (and corresponding rendered \*.html) file with your analysis sent to me by email **BEFORE** the deadline.
+ 
+## Practical aspects
+ 
+ - Deadline 2 February 23:59 hrs., 2018
+ - Use this presentation-file "./capstone/capstone_assignment" to make the assignment
+ - Questions by email, and face-to-face by appointment only (tutor-slots)
+ - Work in pairs, explain your code to each-other, discuss steps you made, integrate you work in one analysis document
+ 
+# The data
+ - `Toxcast`
+ - `US Airpollution`
+ - `Predict molecular properties`  
+ - Or your data from your minor-project
+ 
+Choose one of the datasets below
+
+## Toxcast data
+
+Difficulty: **
+
+ - Toxcast dataset in the folder "./capstone/data/toxcast"
+ 
+
+## Online, open dataset 1: "US air pollution"
+
+Difficulty: **
+
+ - https://www.kaggle.com/sogun3/uspollution
+ - The data for this dataset are in "./capstone/data/uspollution"
+
+## Online, open dataset 2: "predicting molecular properties"
+
+ - If you choose this, you can get the data by a download link: https://www.kaggle.com/burakhmmtgl/predict-molecular-properties/downloads/predict-molecular-properties.zip (due to the big size of the file)
+
+Difficulty: ***
+
+```{r, eval = FALSE}
+library(jsonlite)
+file_json <- file.path(root, "capstone", "data", "predictmolprop", "pubChem_p_00000001_00025000.json")
+example <- fromJSON(file_json, flatten=TRUE)
+example$atoms[[1]]
+```
+
+## Your own data; prerequisites
+
+ - Quantitative data
+ - At least three factor (grouping) variables
+ - At least three different treatments
+ - At least 200 rows of raw data
+
+_Sent an example to me, I will grade the difficulty and approve/disapprove the dataset._
+
+# The assignment
+
+
+## Introduction
+Write a short (max 300 words) introduction that explains some of the details of the data you are analyzing for your capstone assignment
+
+ - The type of data (csv)
+ - The 'experiment' or variables
+ - The source of the data
+ - The anticipated results or aim of the analysis: Which (research) question is being addressed
+ 
+
+                        ### Introductie
+
+De gekozen data set is: "Toxcast", wat het data type csv is.
+Dit is een verzameling data  van onderzoek, gestart op 1900. Het onderzoek ging over de effecten van verschillende soorten drugs en de verschillende toegediende doseringen.
+De eerste onderneming was het checken van de data, waaronder gekeken werd of de variabelen geen spaties of hoofdletters bevatten.
+De gekozen variabelen zijn: ldt( low dose tested), dose_start, dose_end en year.
+De data source is de US EPA toxcast toxrefdb
+In deze data set wordt voornamelijk gekeken in de verschillen in dosering ten opzichten van het jaar en de zuiverheid. Dit willen we doen door het toepassen van de onderdelen, behandeld tijdens de cursus R.
+Aan de hand van de geselecteerde data zijn er 4 grafieken gemaakt, met behulp van codeering.
+ 
+ 
+ 
+## Reading data into R
+
+ - Import the data into R with a code-chunk 
+ 
+```{r}
+patch_to_file <- file.path(root, "capstone", "data", "toxcast", "toxic.csv")
+
+toxcast <- readr::read_csv(file= file.path(root, "capstone", "data", "toxcast", "toxic.csv"))
+
+
+
+library(tidyverse)
+library(cowplot)
+library(readr)
+library(readxl)
+library(ggplot2)
+```
+ 
+ - If zipped unzip the data with R before loading 
+ ### not ziped
+ - User `relative` paths so that your code is portable
+
+
+
+## Inspect the integrity of the data
+
+ - Write a code chunk that checks the data, number of rows, number of variables, names of the variables, data-type of the variable 
+ 
+```{r}
+nrow(toxcast)
+NCOL(toxcast)
+names(toxcast)
+str(toxcast)
+```
+
+ 
+ - Create a summary statistics of each variable that shows confidence intervals, max, min, mean, median values
+
+```{r}
+summary(toxcast)
+
+```
+
+ - Create code that asserts the data-type of each variable
+
+```{r}
+
+str(toxcast)
+
+```
+
+ 
+## Tidy data
+
+ - Write a code chunk that creates a tidy dataframe:
+  * Each variable in it's own column (long format)
+```{r, eval=FALSE}
+install.packages(c("tidyr", "devtools"))
+devtools::install_github("garrettgman/DSR")
+
+data.frame(toxcast$ldt, toxcast$dose_start, toxcast$dose_end, toxcast$purity)
+
+```
+
+  * Each row has it's own observation
+```{r, eval=FALSE}
+a <- data.frame(toxcast$ldt)
+b <- data.frame(toxcast$dose_start)
+c <- data.frame(toxcast$dose_end)
+d <- data.frame(toxcast$purity)
+
+## observations for ldt
+nrow(a)
+NCOL(a)
+names(a)
+str(a)
+max(a)
+min(a)
+
+## observations for dose_start
+nrow(b)
+NCOL(b)
+names(b)
+str(b)
+max(b)
+min(b)
+
+## observations for dose_end
+nrow(c)
+NCOL(c)
+names(c)
+str(c)
+max(c)
+min(c)
+
+## observations for purity
+nrow(d)
+NCOL(d)
+names(d)
+str(d)
+max(d)
+min(d)
+
+
+```
+
+  * Each value has it's own cell
+```{r}
+
+data.frame(toxcast$ldt, toxcast$dose_start, toxcast$dose_end, toxcast$purity)
+
+```
+
+  * Variable names are all lowercase and snake_case and have a short descriptive name 
+## done 
+ - Reshape the data if necessary
+ 
+## Select, Filter, Mutate, Summarize
+
+ - Select proper variables
+### these variables were selected
+  a <- ldt
+  b <- dose_start
+  c <- dose_end
+  d <- purity
+###
+ - Filter values if needed
+```{r}
+## a N/A check 
+sum(is.na(toxcast$ldt))
+sum(is.null(toxcast$ldt))
+
+## b N/A check 
+sum(is.na(toxcast$dose_start))
+sum(is.null(toxcast$dose_start))
+
+        # setting N/A to 0 in b
+          b[(is.na.data.frame(b))] <-0
+          sum(is.na(b))
+          
+        # setting N? to 0 in toxcast$dose_start  
+          toxcast$dose_start[is.na.data.frame(toxcast$dose_start)] <-0
+
+
+##c N/A check 
+sum(is.na(toxcast$dose_end))
+sum(is.null(toxcast$dose_end))
+
+        # setting N/A to 0 in  c
+          c[(is.na.data.frame(c))] <-0
+          sum(is.na(c))
+
+        # setting N? to 0 in toxcast$dose_end  
+          toxcast$dose_end[is.na.data.frame(toxcast$dose_end)] <-0
+
+
+##d N/A check 
+sum(is.na(toxcast$purity))
+sum(is.null(toxcast$purity))
+
+
+        # setting NULL to 0 in toxcast$purity 
+
+            toxcast$purity[toxcast$purity == "NULL"] <- 0
+          
+
+        # setting Purity to numeric data
+            toxcast$purity <- as.numeric(toxcast$purity)
+ toxcast$ldt <- as.numeric(toxcast$ldt)
+  toxcast$dose_start <- as.numeric(toxcast$dose_start)
+   toxcast$dose_end <- as.numeric(toxcast$dose_end)
+
+```
+
+
+ - Create new variables with `dplyr::mutate()` if needed
+
+
+## Chose that it is not needeed
+
+
+ - Summarize the data by grouping variables and calculate mean values
+ 
+```{r}
+
+mean(toxcast$ldt)
+mean(toxcast$dose_start)
+mean(toxcast$dose_end)
+mean(toxcast$purity)
+
+```
+ 
+ 
+## Exploratory data analysis
+Create at least four (4) graphs that show some sort of relationship between variables present in the data
+
+**For example:**
+
+ - Use colours to isolate groups in the data
+ - Use facets to show groups in the data
+ - Use diffrent types of graphs (e.g. `geom_point`, `geom_line`, `geom_bar`, `scale_fille_gradient` )
+ - Provide a graph that indicates information on the distribution of your data
+ 
+## Graph criteria
+
+ - The graph has a descriptive title
+ - The axes have units and decriptive _short_ titles
+ - The graph is visually appealing and the scale is correct
+
+## graph 1
+```{r}
+plot_1 <- ggplot(data = toxcast) + 
+  geom_point(mapping = aes(x = ldt , y = purity)) +
+  geom_jitter(aes(x = ldt, y = purity), position = "jitter") +      ggtitle("Purity of Low dose tested") +
+  xlab("ldt (mg/kg/dag)") +
+  ylab("purity (%)")
+
+plot_1
+```
+ 
+## graph 2
+```{r}
+filtered_data_1 <- toxcast %>%
+  filter(purity <= 100)
+
+
+plot_2 <- ggplot(data = filtered_data_1) + 
+  geom_point(mapping = aes(x = ldt , y = purity)) +
+  geom_jitter(aes(x = ldt, y = purity), position = "jitter") +      ggtitle("Purity of Low dose tested")+
+  xlab("ldt (mg/kg/dag)") +
+  ylab("purity (%)")
+
+
+plot_2
+
+
+
+```
+
+## graph 3
+```{r}
+filtered_data_2 <- filtered_data_1 %>%
+  filter(purity >= 90)
+
+
+filtered_data_3 <- filtered_data_2 %>%
+  filter(ldt <= 500)
+
+plot_3 <- ggplot(data = filtered_data_3) + 
+  geom_point(mapping = aes(x = ldt , y = purity)) +
+  geom_jitter(aes(x = ldt, y = purity), position = "jitter")+      ggtitle("Purity of Low dose tested")+
+  xlab("ldt (mg/kg/dag)") +
+  ylab("purity (%)")
+
+
+plot_3
+
+
+```
+ 
+```{r}
+filtered_data_4 <- toxcast %>%
+  filter(year >= 1900)
+
+filtered_data_5 <- filtered_data_4 %>%
+  filter(year <= 1970)
+
+
+plot_4 <- ggplot(data = filtered_data_5) + 
+  geom_line(mapping = aes(x = year , y = dose_start)) +
+  geom_jitter(aes(x = year, y = dose_start), position = "jitter")+      ggtitle("start doses per jaar")+
+  xlab("time (years)") +
+  ylab("dose_start (mg/kg/dag))")
+
+
+plot_4
+```
+
+ 
+ 
+## Results
+
+ - Write a short paragraph (max 500 words) on your resulting graphs.
+ - What does the reader have to take away from the graphs you've shown?
+ 
+ 
+ 
+                         ### Results
+            
+In de geproduceerde grafieken zijn de relaties tussen de dosering ten opzichten van het jaar en ten opzichte van de zuiverheid terug te zien.
+De eerste 3 grafieken laten zien hoe de visualisatie van de data beïnvloed kan worden door data te filteren. Zo kan het gewilde/interessante gebied beter gevisualiseerd worden.
+De zuiverheid was gefilterd tussen de 90 %en 100%, omdat dit de belangrijkste data is voor deze stoffen.
+Verder is te zien in de vierde grafiek hoe de dosering verandereden tussen de jaren 1900 en 1970. Dit gebied is specifiek gekozen, omdat in deze periode een duidelijk interval zichtbaar is. Dit interval duid op een afnamen van onderzoek over een periode van ongeveer 60 jaar.
+
+**_Tell a data-story!_**
+
+## Conclusion
+
+ - Refer to the introduction and write a short (max 200 words) conclusion on you analysis  - Identify gaps in you analysis
+ - What still needs to be done? / What is lacking?
+
+                          ### Conclusie
+
+Er is duidelijk te zien in de resultaten dat de zuiverheid het meest tussen de 90 en 100 % aanwezig is. Verder is duidelijk te dat tussen de periode 1955 en 1964 nauwelijks onderzoek is gedaan, waarna de eerste 2 jaar het onderzoek vervolgd werd. Op een erg vergelijkbare wijze als zo'n 60 jaar hiervoor.
+
+

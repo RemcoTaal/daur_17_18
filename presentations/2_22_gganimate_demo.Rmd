@@ -1,0 +1,86 @@
+---
+title: "gganimate; introducing animations with ggplot2 code"
+author: "Marc A.T. Teunis"
+date: '`r Sys.Date()`'
+output:
+  ioslides_presentation: 
+    highlight: pygments
+    widescreen: yes
+---
+<style>
+
+.footer {
+    font-size: 16pt;
+    color: Black;
+    font-family: 'Helvetica'
+    content: attr(label);
+    position: absolute;
+    margin-left: auto;
+    margin-right: auto;
+    left: 0;
+    right: 0;
+    text-align:center;
+    bottom: 10px;
+    line-height: 1.9;
+    display: block;
+}
+
+</style>
+
+<div class="footer" style="margin-top;font-size:120%;"> 
+Data Analysis Using R - `r Sys.Date()` </div>
+
+```{r, root_1, include=FALSE}
+## defines the root of the project for later use
+require("rprojroot") || utils::install.packages("rprojroot")
+library(rprojroot)
+root <- find_root_file(criterion = is_rstudio_project)
+```
+
+```{r, knitr_setup, warning=FALSE, error=FALSE, message=FALSE, include=FALSE}
+## setting knitr options
+if (!require("knitr")) utils::install.packages("knitr")
+library(knitr)
+
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, error = FALSE, message = FALSE, fig.width = 3, fig.height = 3)
+knitr::opts_knit$set(root.dir = root)
+```
+
+# The original Bubble Chart on Life Expectancy
+http://www.gapminder.org/tools/#_locale_id=en;&chart-type=bubbles
+
+# ggnanimate example
+
+## Setup
+
+Install ImageMagick
+see http://www.imagemagick.org/script/download.php 
+
+Packages:
+```{r}
+# devtools::install_github("dgrtwo/gganimate")
+# install.packages("gapminder")
+library(gganimate)
+library(ggplot2)
+library(gapminder)
+library(tidyverse)
+
+theme_set(theme_bw())
+```
+
+## Example data
+```{r}
+gapminder <- gapminder::gapminder
+p <- ggplot(gapminder, aes(gdpPercap, lifeExp, size = pop, color = continent, frame = year)) +
+  geom_point() +
+  scale_x_log10()
+p
+```
+
+## Animation
+```{r, fig.show='animate', eval=FALSE}
+# gganimate(p, saver = "gif")
+```
+
+
+

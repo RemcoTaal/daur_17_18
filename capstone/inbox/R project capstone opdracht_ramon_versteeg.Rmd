@@ -1,0 +1,243 @@
+---
+title: "R opdracht"
+author: "Ramon Versteeg, Shirley Leliveld"
+date: "23-1-2018"
+output: html_document
+---
+
+INTRODUCTIE
+Voor de minor ABPC voor het vak data-analyse met behulp van R is er een dataset gekozen om een data-analyse te doen. Er is hiervoor gekozen om de toxcast-dataset te analyseren. Binnen toxcast-dataset bevinden zich drie datatypes, de numerics, de characters en de logicals vectoren. Voor het bepalen van het aantal NA’s wordt er gebruik gemaakt van logical vectoren. De toxcast is een kommagescheiden bestand (comma-separated values (.csv)), waarbij alle waarden die in een aparte cel zitten worden gescheiden door middel van een kommateken. De toxcast-dataset is bedoeld om de het geen effectniveau (NEL), het laagste effectniveau (LEL), de geen waargenomen bijwerkingsniveau (NOAEL) en de laagst waargenomen effectniveau (LOAEL) voor de duizende diertoxiciteitonderzoeken die momenteel in de ToxRefDB worden uitgevoerd te analyseren. De toxcast-dataset geeft aan welke chemicaliën gevaar opleveren. Hierbij is gekeken naar de invloed van verschillende chemicaliën op honden, hamsters, muizen, konijnen en ratten.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+if (!require("rprojroot")) install.packages("rprojroot")
+library(rprojroot)
+root <- find_root_file(criterion = is_rstudio_project)
+root
+```
+
+```{r}
+# Het importeren van de data in R
+
+library(readr)
+toxrefdb_nel_lel_noael_loael_summary_AUG2014_FOR_PUBLIC_RELEASE <- read_csv("capstone/data/toxcast/toxrefdb_nel_lel_noael_loael_summary_AUG2014_FOR_PUBLIC_RELEASE.csv")
+
+View(toxrefdb_nel_lel_noael_loael_summary_AUG2014_FOR_PUBLIC_RELEASE)
+```
+
+```{r}
+# Het laden van de benodigde packages 
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+```
+
+```{r}
+# Het maken van een relatief path
+path_to_file_toxcast <- file.path(root, "capstone/data/toxcast/toxrefdb_nel_lel_noael_loael_summary_AUG2014_FOR_PUBLIC_RELEASE.csv")
+
+toxcast <- toxrefdb_nel_lel_noael_loael_summary_AUG2014_FOR_PUBLIC_RELEASE
+```
+
+```{r}
+head(toxcast) # Controle van de data 
+tail(toxcast) # Controle van de data 
+ls(toxcast) # Lijst van de variabelen
+str(toxcast) # Datatype van the variabelen
+class(toxcast) # Klasse van de data
+dim(toxcast) # Aantal observaties en variabelen 
+toxcast
+```
+
+```{r}
+nrow(toxcast) # Aantal rijen
+ncol(toxcast) # Aantal variabelen
+names(toxcast) # Namen van de variabelen
+ 
+toxcast$X1 # De waarden van een bepaalde variabele bekijken 
+toxcast$chemical_id # De waarden van een bepaalde variabele bekijken
+```
+
+```{r}
+# Het bekijken van de statistieken van elke variabele, zoals het maximum, minimum, gemiddelde, de mediaan en de datatype van de variabele
+summary(toxcast)
+```
+
+```{r}
+sum(is.na(toxcast)) # Het aantal missing values
+str(toxcast) # Het compact weergeven van de interne structuur van de dataset
+arrange(toxcast) # Het sorteren van de data
+```
+
+```{r}
+toxcast <- read.csv(file = path_to_file_toxcast, na.strings = c("NULL", "")) # Alle "NULL"-waarden omzetten naar een "NA"-waarde
+complete.cases(toxcast) # Het bekijken van de NA waarden. Bij aanwezigheid van NA wordt er "FALSE" gegeven
+toxcast$source_study_alphanumeric_id <- NULL # Het verwijderen van een kolom met dezelfde informatie als een andere kolom
+sum(is.na(toxcast)) # Het tellen van het aantal missing values
+toxcast <- na.omit(toxcast) # Het verwijderen van de "NA"'s uit de dataset 
+sum(is.na(toxcast)) # Het checken of de "NA"'s uit de dataset verwijderd zijn
+```
+
+```{r}
+levels(toxcast$dose_unit) # Het controleren van de variabele voor het tidy maken van de dataset
+```
+
+```{r}
+# Het filteren van de "mg/kg/day" waarde om de data tegenover elkaar uit te kunnen zetten
+toxcast<- as.tibble(toxcast)
+toxcast_complete <- toxcast %>%
+  filter(dose_unit == "mg/kg/day") 
+```
+
+```{r}
+# De namen van variabelen inkorten
+colnames(toxcast_complete)[colnames(toxcast_complete)=="chemical_sets"] <- "chem_sets"
+colnames(toxcast_complete)[colnames(toxcast_complete)=="entry_level_id"] <- "entry_lvl_id"
+colnames(toxcast_complete)[colnames(toxcast_complete)=="source_study_numeric_id"] <- "source_study_num_id"
+colnames(toxcast_complete)[colnames(toxcast_complete)=="study_level_loael_dose_level"] <- "study_lvl_loael_dose_lvl"
+```
+
+```{r}
+# Het verwijderen van hoofdletters uit de dataset
+names(toxcast_complete) <- tolower(names(toxcast_complete))
+```
+
+```{r}
+# Het selecteren van belangrijke variabelen
+toxcast_data <- toxcast_complete
+toxcast_data <- select(toxcast, "chemical_name","species", "admin_method", "dose_start", "dose_start_unit", "dose_end", "dose_end_unit", "ldt", "hdt", "dose_unit", "effect_category", "loael_dose", "noael_dose")
+```
+
+```{r}
+# Het verwijderen van "ppm" als dose-unit in de dataset
+toxcast_data <- as.tibble(toxcast_data)
+toxcast_complete <- toxcast_data %>%
+  filter(dose_unit != "ppm") 
+```
+
+```{r}
+# Het berekenen van de gemiddelden van bepaalde variabelen uit de dataset 
+names(toxcast_complete)
+toxcast_summary <- toxcast_complete %>%
+  select(chemical_name:noael_dose) %>%
+  group_by(species) %>%
+  summarise(mean_dose_start = mean(dose_start),  
+            mean_dose_end = mean(dose_end),
+            mean_ldt = mean(ldt),
+            mean_hdt = mean(hdt),
+            mean_loael_dose = mean(loael_dose),
+            mean_noael_dose = mean(noael_dose)) %>%
+  arrange(species) # Het sorteren van de data op alfabetische volgorde van de verschillende dieren
+```
+
+```{r}
+# Het maken van een plot waarin de verhouding van ldt en loael tegenover elkaar zijn uitgezet per dier in een puntdiagram
+names(toxcast_complete)
+plot_1_ldt_loael_dose <- ggplot(data = toxcast_complete,
+                       aes(x = ldt, y = loael_dose, color = species)) +
+  geom_jitter(position = "jitter") +
+  ggtitle("Verhouding ldt en loael dose per dier") +
+  xlab("ldt (mg/kg/dag)") +
+  ylab("loael dose (mg/kg/dag)")
+plot_1_ldt_loael_dose
+```
+
+```{r}
+# Het maken van een plot waarin de verhouding van ldt en loael tegenover elkaar zijn in een puntdiagram gefacet per dier
+names(toxcast_complete)
+plot_2_verhouding_ldt_loael_dose <- ggplot(data = toxcast_complete,
+                       aes(x = ldt, y = loael_dose)) +
+  geom_jitter(position = "jitter") +
+  facet_wrap( ~ species)+
+  ggtitle("Verhouding ldt en loael dose per dier") +
+  xlab("ldt (mg/kg/dag)") +
+  ylab("loael dose (mg/kg/dag)")
+plot_2_verhouding_ldt_loael_dose
+```
+
+```{r}
+# Het maken van een boxplot waarin de dieren staan uitgezet tegen de laagst geobserveerde niveau met een nadelig effect
+plot_3_loael_dose <- ggplot(data = toxcast_complete, 
+       aes(x = species, y = loael_dose)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Laagst geobserveerde niveau met een nadelig effect op dieren")+
+  xlab("dieren")+
+  ylab("loael (mg/kg/dag)")
+plot_3_loael_dose
+names(toxcast_complete)
+
+# Vanwege de uitschieter bij de muis worden alle waarden onder de 9000 geselecteerd om een beter beeld te verkrijgen
+toxcast_loael_lower_9000 <- toxcast_complete[ which(toxcast_complete$loael_dose < 9000), ]
+plot_4_loael_dose_lager_9000 <- ggplot(data = toxcast_loael_lower_9000, 
+       aes(x = species, y = loael_dose)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Laagst geobserveerde niveau met een nadelig effect op dieren lager dan 9000")+
+  xlab("dieren")+
+  ylab("loael (mg/kg/dag)")
+plot_4_loael_dose_lager_9000
+```
+
+```{r}
+# Het berekenen van de gemiddelden van bepaalde variabelen uit de dataset met alle waarden voor loael lager dan 9000
+toxcast_summary_loael_lower_9000 <- toxcast_loael_lower_9000 %>%
+  select(chemical_name:noael_dose) %>%
+  group_by(species) %>%
+  summarise(mean_dose_start = mean(dose_start),  
+            mean_dose_end = mean(dose_end),
+            mean_ldt = mean(ldt),
+            mean_hdt = mean(hdt),
+            mean_loael_dose = mean(loael_dose),
+            mean_noael_dose = mean(noael_dose)) %>%
+  arrange(species) # Het sorteren van de data op alfabetische volgorde van de verschillende dieren
+```
+
+```{r}
+# Het maken van een staafdiagram waarin de laagst waargenomen gemiddelde effectniveau per dier staat uitgezet
+plot_5_laagst_waargenomen_effectniveau <- ggplot(data = toxcast_summary, aes(x=species, y=mean_loael_dose)) +
+  geom_bar(stat = "identity") + ylab("mean_loael_dose") +
+  xlab("species") + ggtitle("Laagst waargenomen gemiddelde effectniveau per dier")+
+  xlab("dieren")+
+  ylab("loael (mg/kg/dag)")
+plot_5_laagst_waargenomen_effectniveau
+
+# Het maken van een staafdiagram waarin de laagst waargenomen gemiddelde effectniveau per dier staat uitgezet lager dan 9000
+plot_6_laagst_waargenomen_effectniveau_lager_9000 <- ggplot(data = toxcast_summary_loael_lower_9000, aes(x=species, y=mean_loael_dose)) +
+  geom_bar(stat = "identity") + ylab("mean_loael_dose") +
+  xlab("species") + ggtitle("Laagst waargenomen gemiddelde effectniveau per dier")+
+  xlab("dieren")+
+  ylab("loael (mg/kg/dag)")
+plot_6_laagst_waargenomen_effectniveau_lager_9000 
+```
+
+```{r}
+# Het sorteren van de dataset om een subset te vormen en het maken van de subplots
+toxcast_first35 <- arrange(toxcast_complete, chemical_name)
+
+# Het vormen van een subset van de eerste 35 waarden, gesorteerd om chemische stof
+toxcast_first35 <- toxcast_first35[1:35, ]
+View(toxcast_first35)
+
+# Het maken van een plot waarin de verhouding ldt en loael van de eerste 18 chemische stoffen staan weergegeven gesorteerd per dier
+plot_7_verhouding_ldt_loael_dose_sort_by_chemicals <- ggplot(data = toxcast_first35,
+                       aes(x = ldt, y = loael_dose, colour = species)) +
+  geom_point() + geom_jitter(position = "jitter") +
+  facet_wrap( ~ chemical_name)+
+  ggtitle("Verhouding ldt en loael dose van de eerste 18 chemische stoffen weergegeven per dier") +
+  xlab("ldt (mg/kg/dag)") +
+  ylab("loael dose (mg/kg/dag)")
+plot_7_verhouding_ldt_loael_dose_sort_by_chemicals
+```
+
+RESULTATEN
+In plot 1 is de verhouding ldt tegen Loael dose uitgezet van de verschillende dieren zoals de hond, hamster, muis, konijn en rat . De ldt staat voor de minimale dosis die getest is per mg/kg per dag en de Loael staat voor het laagste geobserveerde niveau die een nadelige effect geeft. Uit de grafiek is te zien dat de meeste dieren geclusterd bij elkaar liggen. Vanuit de grafiek is te zien dat alleen bij de konijnen en ratten de minimale dosis verhoogd is en daarbij zijn de nadelige effecten niet super erg verhoogd aanwezig, wat je wel zou verwachten.Deze dieren kunnen dus goed tegen de dosis zonder daar een nadelig effect van te krijgen.  Ook is er bij de muizen 1 uitschieter te zien die bij een lage minimale dosis een laag nadelig effect heeft op het dier. Terwijl dit bij de andere muizen niet het geval is. In plot 2 zijn dezelfde resultaten tegen elkaar uitgezet als in plot 1. Alleen zijn hierbij de grafieken per dier weergegeven. Ook hieruit is te zien dat de konijnen, ratten en muizen, dieren ertussen hebben zitten die een hogere minimale dosis toegediend hebben gekregen. 
+In boxplot 3 is het laagst geobserveerde niveau met een nadelig effect per dier uitgezet. Ook is er vanuit deze boxplot te zien dat er 1 muis is die een hoog niveau nodig heeft voordat het een nadelig effect krijgt. Bij de muis is de spreiding in de boxplot wel groter in vergelijking met de andere dieren. Ook zijn bij de ratten en konijnen het laagst geobserveerde niveau die een nadelig effect heeft relatief hoog. In plot 4 is vanwege de uitschieter bij de muis zijn alle waarden boven de 9000 eruit gehaald om de resultaten beter te laten zien.  
+In plot 5 is een staafdiagram weergegeven van het gemiddelde laagst waargenomen effectniveau per dier. Uit de staafdiagram is te zien dat de honden een lage dosis nodig hebben voor een nadelig effect en dat dit niveau bij muizen veel hoger ligt. In plot 6 zijn de waardes boven de 9000 verwijderd om het gemiddelde beter bij elkaar te laten liggen. 
+In plot 7 is de loael dose uitgezet tegen de ldt van de eerste 35 waardes van 18 chemische stoffen. In de eerste 19 chemische stoffen is de muis helemaal niet terug te vinden, dat wil zeggen dat deze stoffen niet getest is op muizen. Verder is de rat het meest voorkomende in de plotten, de rat loopt bij de eerste 35 chemische stoffen al gevaar op. 
+
+CONCLUSIE
+Binnen de resultaten is gekeken naar de in de introductie genoemde parameters. Hierbij gebleken dat bij de relatief gezien de meeste chemische stoffen bij een lage dosis al schadelijk zijn. Verder is ook te zien dat bijvoorbeeld bij de muis een grote uitschieter is, waarbij één chemische stof veel minder schadelijk is dan de rest van de chemische stoffen. Hierdoor is er een grotere spreiding bij de muis voor de loael. Bij het konijn en de rat is er veel vaker getest bij een hogere laagst geteste dosis dan bij andere dieren. Hiervoor is geen verklaring. Verder is de gemiddelde loael voor de muis relatief hoger dan bij de andere dieren. Ook dit is afkomstig door de uitschieter van een chemische stof. Bij het verwijderen van deze waarden boven de 9000 zullen de gemiddelden dichterbij elkaar komen te liggen voor alle dieren. Bij het uitzetten van de eerste 18 chemische stoffen is te zien dat er relatief weinig spreiding is binnen deze stoffen. De waarden van verschillende dieren liggen relatief dicht bij elkaar. Wel is te zien dat bij de geteste dieren 2,4-Dichlorophenol minder gevaar oplevert dan bij 2-Methyl-3(2H)-isothiazolone omdat bij 2,4-Dichlorophenol de loael hoger ligt bij de laagst geteste dosis dan bij 2-Methyl-3(2H)-isothiazolone. In het vervolg kunnen er meer testen worden uitgevoerd bij verschillende dieren en op verschillende dosisniveau's.

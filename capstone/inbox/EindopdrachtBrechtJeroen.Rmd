@@ -1,0 +1,805 @@
+---
+title: "Eind opdracht"
+author: "Jeroen van Amstel & Brecht Berben"
+date: "01-1-2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Luchtvervuiling in de Verenigde Staten 
+
+# Introductie:
+#### De gebruikte dataset heeft betrekking op de luchtvervuiling in de Verenigde Staten en is gedocumenteerd door de Amerikaanse Environmental Protection Agency (EPA). EPA is een agentschap van de federale overheid van de Verenigde Staten dat is opgericht met het doel de menselijke gezondheid en het milieu te beschermen.
+
+#### De datasheet die gebruikt is bevat data die iets zegt over de aanwezigheid van luchtvervuilende stoffen in de verenigde staten. Van NO2, 03, CO2 en SO3 is o.a. de Air Quality Index gemeten (AQI). De AQI is een maat die aangeeft hoe vervuild de lucht is.  Naarmate de AQI toeneemt, zal een steeds groter percentage van de bevolking waarschijnlijk toenemende ernstige nadelige gezondheidseffecten ervaren. 
+
+# Inhoud
+#### Er zijn in totaal 28 velden:
+#
+#### Staatcode:        de code toegewezen door US EPA aan elke staat
+#### Provinciale code: de code van provincies in een specifieke staat die is toegewezen door US EPA
+#### Sitenummer:       het sitenummer in een specifieke provincie toegewezen door US EPA
+#### Adres:            adres van de monitoringsite
+#### Staat:            staat van monitoring site
+#### Provincie:        district van monitoring site
+#### Plaats:           Plaats van de monitoringsite
+#### Datum Lokaal:     Datum van monitoring
+#
+#### De vier verontreinigende stoffen (NO2, O3, SO2 en O3) hebben elk 5 specifieke kolommen. Bijvoorbeeld voor NO2:
+#
+#### NO2-eenheden:       de eenheden gemeten voor NO2
+#### NO2-gemiddelde:     het rekenkundig gemiddelde van concentratie van NO2 binnen een gegeven dag
+#### NO2 AQI:            de berekende luchtkwaliteitsindex van NO2 op een gegeven dag
+#### NO2 1e max. Waarde: de maximale waarde verkregen voor NO2-concentratie op een bepaalde dag
+#### NO2 1e Max uur:     het uur waarop de maximale NO2-concentratie op een bepaalde dag werd vastgelegd
+#
+#
+#### Dit project is opgezet om te kijken of de lucht in de verenigde staten erg vervuild is en in welke gebieden er een hoge of lage AQI is gemeten.
+#
+### Hoofdvraag: 
+#### Kunnen we inzicht krijgen in de luchtvervuiling in de Verenigde Staten gebruikmakend van R.
+#
+### Deelvragen: 
+#### 1) Welke luchtvervuilende stof komt het meeste voor?  
+#
+#### 2) In welke staat komt het meest van de vervuilende stoffen voor? 
+#
+#### 3) vindt er een toename of afname plaats in verloop van tijd van de vier veervuilende stoffen?
+#
+## Het inladen van het databestand in R.
+```{r}
+if (!require("rprojroot")) install.packages("rprojroot")
+library(rprojroot)
+root <- find_root_file(criterion = is_rstudio_project)
+root
+```
+
+## Het uitpakken van het databestand, met behulp van R.
+```{r}
+path_to_file <- file.path(root, "capstone", "data", "uspollution", "uspollution.zip")
+path_to_output_dir <- file.path(root, "capstone", "data", "uspollution")
+unzip(path_to_file, exdir = path_to_output_dir)
+
+
+uspollution <- readr::read_delim(file = file.path(root, "capstone", "data", "uspollution", "pollution_us_2000_2016.csv"), delim =",")
+
+
+unzip("uspollution.zip", files = NULL, list = FALSE, overwrite = TRUE,
+      junkpaths = FALSE, exdir = ".", unzip = "uspollution.zip",
+      setTimes = FALSE)
+```
+
+Al met al zijn dit een paar functies (codes), die telkens worden toegevoegd om een uiteindelijke plot te krijgen. Als men de code weet, kunnen factoren zeer makkelijk veranderd worden om andere plotten te vormen. Dit is snel en reproduceerbaar.
+#
+
+# Resultaten:
+#
+### Aan de slag met het databestand.
+```{r}
+# Maak een kopie van het data-bestand, dat aangepast kan worden:
+data_origineel <- uspollution
+```
+
+```{r}
+# Zijn er missende waardes aanwezig in de datasheet?
+sum(is.na(data_origineel))
+## sum(is.na()) = 1746230, zoveel missende waardes zijn er in deze datasheet.
+```
+
+```{r}
+# Klasse van object en het aantal items in het object
+class(data_origineel)
+
+length(data_origineel)
+## length = 29, 29 kolommen in data_origineel
+```
+
+```{r}
+# De namen van de kolommen worden weergegeven door:
+colnames(data_origineel)
+
+## Aantal rijen zonder missende waardes:
+nrow(data_origineel[complete.cases(data_origineel),])
+### 436876
+
+## Check of een variabele missende waardes bevat:
+any(is.na(data_origineel$'State Code'))         #FALSE
+any(is.na(data_origineel$'County Code'))        #FALSE
+any(is.na(data_origineel$'Site Num'))           #FALSE
+any(is.na(data_origineel$'Address'))            #FALSE
+any(is.na(data_origineel$'State'))              #FALSE
+any(is.na(data_origineel$'County'))             #FALSE
+any(is.na(data_origineel$'City'))               #FALSE
+any(is.na(data_origineel$'Date Local'))         #FALSE
+any(is.na(data_origineel$'NO2 Units'))          #FALSE
+any(is.na(data_origineel$'NO2 Mean'))           #FALSE
+any(is.na(data_origineel$'NO2 1st Max Value'))  #FALSE
+any(is.na(data_origineel$'NO2 1st Max Hour'))   #FALSE
+any(is.na(data_origineel$'NO2 AQI'))            #FALSE
+any(is.na(data_origineel$'O3 Units'))           #FALSE
+any(is.na(data_origineel$'O3 Mean'))            #FALSE
+any(is.na(data_origineel$'O3 1st Max Value'))   #FALSE
+any(is.na(data_origineel$'O3 1st Max Hour'))    #FALSE
+any(is.na(data_origineel$'O3 AQI'))             #FALSE
+any(is.na(data_origineel$'SO2 Units'))          #FALSE
+any(is.na(data_origineel$'SO2 Mean'))           #FALSE
+any(is.na(data_origineel$'SO2 1st Max Value'))  #FALSE
+any(is.na(data_origineel$'SO2 1st Max Hour'))   #FALSE
+any(is.na(data_origineel$'SO2 AQI'))            #TRUE
+any(is.na(data_origineel$'CO Units'))           #FALSE
+any(is.na(data_origineel$'CO Mean'))            #FALSE
+any(is.na(data_origineel$'CO 1st Max Value'))   #FALSE
+any(is.na(data_origineel$'CO 1st Max Hour'))    #FALSE
+any(is.na(data_origineel$'CO AQI'))             #TRUE
+
+## Van een kolom die géén missende waardes heeft (#FALSE), zijn er zoveel rijen met data:
+nrow(data_origineel[complete.cases(data_origineel[,"State Code"]),])
+## 1746661 values. Overeenkomend met het aantal rijen, wat logisch is.
+
+## Word er nu gekeken naar de kolommen met missing values (TRUE):
+nrow(data_origineel[complete.cases(data_origineel[,"SO2 AQI"]),])
+## 873754. In deze kolom zijn veel meer waardes niet ingevuld. 1746661-873754= 872907 waardes missen.
+
+nrow(data_origineel[complete.cases(data_origineel[,"CO AQI"]),])
+## 873338. In deze kolom zijn 1746661-873338= 873323 missing values.
+```
+
+### Het opschonen van het databestand.
+```{r}
+## Te zien is dat kolom 1 ("X1") het aantal rijen aangeeft (1, 2, 3, 4, ...). Dit is overbodig, omdat het slechts het aantal rijen telt. Daar is geen aparte kolom voor nodig. Om deze kolom weg te krijgen het volgende:
+
+data_zonderX <- data_origineel
+data_zonderX$X1 = NULL
+```
+
+```{r}
+# Er zijn veel rijen in de datasheet met missing values. Om deze rijen weg te halen gebruik je de volgende code:
+data_noNA <- data_zonderX
+data_noNA <- na.omit(data_noNA)
+## Het nieuwe data-bestand, "data_noNA", bevat 436876 rijen.
+```
+
+```{r}
+# Verwijderen van "overbodige" kolommen; deze kolommen gaven slechts de concentratie van de desbetreffende stoffen aan:
+## NO2 en SO2 in ppb, O3 en CO in ppm.
+data_clear <- data_noNA
+data_clear$'NO2 Units' = NULL
+data_clear$'O3 Units' = NULL
+data_clear$'SO2 Units' = NULL
+data_clear$'CO Units' = NULL
+```
+
+```{r}
+# controle of er nog NAs in de data_clear zitten. Dit zou 0 moeten worden en dat klopt.
+sum(is.na(data_clear))
+```
+
+```{r}
+# Verander de namen van variabelen in lowercase en snake_case:
+names(data_clear) <- tolower(names(data_clear))
+names(data_clear) <- c("state_code", "county_code", "site_num", "address", "state", "county", "city", "date_local", "NO2_mean", "NO2_1st_max_value", "NO2_1st_max_hour", "NO2_aqi", "O3_mean", "O3_1st_max_value", "O3_1st_max_hour", "O3_aqi", "SO2_mean", "SO2_1st_max_value", "SO2_1st_max_hour", "SO2_aqi", "CO_mean", "CO_1st_max_value", "CO_1st_max_hour", "CO_aqi")
+```
+
+```{r}
+##In deze datasheet zijn 144 steden onderzocht, in 47 verschillende staten:
+length(unique(data_clear$city))
+length(unique(data_clear$state))
+```
+
+### Hoe is een ggplot opgebouwd?
+```{r}
+#Hoe is een ggplot opgebouwd?
+
+## De functie ggplot is erg handig om plotten mee te vormen. Door verschillende functies toe te voegen kunnen meerdere functies toegepast worden.
+
+## De basis van deze code is:
+#ggplot(data = "datasheet", aes(x = "data x-as", y = "data y-as"))
+
+## Voeg nu een factor toe, waarmee verschillende lijnen kleur en vulling krijgen.
+#ggplot(data = "datasheet", aes(x = "data x-as", y = "data y-as")) +
+#  aes(colour = "factor die uitgezet wordt, door x en y", fill = "factor die uitgezet wordt, door x en y")
+
+## Dit is nog geen plot. Om punten (waardes) zichtbaar te krijgen voegt men de volgende functie toe:
+#ggplot(data = "datasheet", aes(x = "data x-as", y = "data y-as")) +
+#  aes(colour = "factor die uitgezet wordt, door x en y", fill = "factor die uitgezet wordt, door x en y") +
+#  stat_summary(fun.y = "mean", geom = "bar")
+### De "geom="-functie zegt hoe geplot moet worden (bar = staafdiagram, line = lijndiagram).
+
+## De opmaak gaat met de volgende codes. De assen worden gelabeled en er kan een titel worden toegevoegd:
+#ggplot(data = "datasheet", aes(x = "data x-as", y = "data y-as")) +
+#  aes(colour = "factor die uitgezet wordt, door x en y", fill = "factor die uitgezet wordt, door x en y") +
+#  stat_summary(fun.y = "mean", geom = "bar") +
+#  labs(x = "Naam x-as", y = "Naam y-as",
+#      title = "Titel van de plot")
+
+## Ook kunnen trendlijnen worden toegevoegd:
+# ggplot(data = "datasheet", aes(x = "data x-as", y = "data y-as")) +
+#  aes(colour = "factor die uitgezet wordt, door x en y", fill = "factor die uitgezet wordt, door x en y") +
+#  stat_summary(fun.y = "mean", geom = "bar") +
+#  labs(x = "Naam x-as", y = "Naam y-as",
+#       title = "Titel van de plot") +
+#  geom_smooth()
+### Echter in veel plots had deze trendlijn dezelfde kleur als de betreffende factor, waardoor het slecht zichtbaar was. Door niks in de haakjes achter "geom_smooth() te zetten, wordt een normale trendlijn geplot voor de bekende waardes. Een lineair model kan worden toegevoegd door; "geom_smooth(method = "lm")". De trendlijn kan worden aangepast door bijvoorbeeld;
+#ggplot(data = "datasheet", aes(x = "data x-as", y = "data y-as")) +
+#  aes(colour = "factor die uitgezet wordt, door x en y", fill = "factor die uitgezet #wordt, door x en y") +
+#  stat_summary(fun.y = "mean", geom = "bar") +
+#  labs(x = "Naam x-as", y = "Naam y-as",
+#       title = "Titel van de plot") +
+#  geom_smooth(aes(linetype = "factor die wordt uitgezet door x en y"), colour = "black")
+### De linetypefunctie zorgt ervoor dat de trendlijnen anders zijn, voor elke factor. Hierdoor zijn ze te onderscheiden. De kleur kan ook worden aangepast.
+
+## Ook kan de achtergrond worden aangepast, zodat de schalen makkelijker te zien zijn:
+#ggplot(data = "datasheet", aes(x = "data x-as", y = "data y-as")) +
+#  aes(colour = "factor die uitgezet wordt, door x en y", fill = "factor die uitgezet #wordt, door x en y") +
+#  stat_summary(fun.y = "mean", geom = "bar") +
+#  labs(x = "Naam x-as", y = "Naam y-as",
+#       title = "Titel van de plot") +
+#  geom_smooth(aes(linetype = "factor die wordt uitgezet door x en y"), colour = "black") +
+#  theme_gray()
+### Dit geeft een grijze achtergrond, waardoor het in sommige gevallen beter zichtbaar is.
+
+## De tekst van de factoren kan nog worden aangepast. Soms overlappen deze waardoor ze niet leesbaar zijn. Met de volgende functie kan de tekst worden gedraaid:
+#ggplot(data = "datasheet", aes(x = "data x-as", y = "data y-as")) +
+#  aes(colour = "factor die uitgezet wordt, door x en y", fill = "factor die uitgezet wordt, door x en y") +
+#  stat_summary(fun.y = "mean", geom = "bar") +
+#  labs(x = "Naam x-as", y = "Naam y-as",
+#       title = "Titel van de plot") +
+#  geom_smooth(aes(linetype = "factor die wordt uitgezet door x en y"), colour = "black") +
+#  theme_gray() +
+#  theme(axis.text.x = element_text(angle = 90, hjust = 1 ))
+```
+
+#### Al met al zijn dit een paar functies (codes), die telkens worden toegevoegd om een uiteindelijke plot te krijgen. Als men de code weet, kunnen factoren zeer makkelijk veranderd worden om andere plotten te vormen. Dit is snel en reproduceerbaar.
+
+
+### Het inladen van pakketten voor het maken van een plot.
+```{r}
+# Laden van enkele paketten om plotten te vormen:
+library(tidyverse)
+library(cowplot)
+library(readr)
+library(readxl)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+```
+
+### Het maken van een boxplot:
+```{r}
+## Opschonen van data:
+head(data_clear)
+sum(is.na(data_clear))
+
+names(data_clear)
+
+## Alle nummerieke data moet worden geselecteerd:
+x <- names(data_clear)[c(12, 16, 20, 24)]
+x
+
+data_select <- data_clear %>%
+  select(date_local,
+         NO2_aqi,
+         O3_aqi,
+         SO2_aqi,
+         CO_aqi)
+
+## Om deze grafiek te kunnen maken, moeten we de gegevens opnieuw vormgeven naar een "gestapeld" of zogenaamd "lang" formaat:
+data_select <- data_select %>%
+  gather(NO2_aqi:CO_aqi, 
+         key = pollutants, value = air_quality_index)
+
+head(data_select)
+```
+
+```{r}
+ggplot(data = data_select, 
+       aes(x = pollutants, y =  air_quality_index)) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1 )) +
+  labs(x = "Soort luchtverontreinigende stoffen", y = "Air Quality Index", 
+              title = "Voorkomen luchtvervuilers in US (2000 - 2016)")
+```
+
+
+### Figuur 1: De gemiddelde AQI voor elke luchtvervuilende stof, gemeten over alle steden, in alle staten, voor het volledige verloop van tijd. Te zien is dat er veel uitschieters tussen zitten. Gemiddeld gezien heeft O3 (ozon) de hoogste Air Quality Index wat betekent dat deze gemiddeld genomen het meest voorkomt in de VS.
+
+### Vat de data samen met dplyr.
+```{r}
+data_summary <- data_clear %>%
+  group_by(state, date_local,  NO2_aqi, SO2_aqi, O3_aqi, CO_aqi ) %>%
+  summarise(mean_date_local = mean(date_local)) 
+## Deze kolommen zijn gekozen om daarmee plotten te maken. 
+
+# Vorm een plot met een "smoother", de methode voor "smoothing" is "linear model"
+ggplot(data = data_summary, 
+  aes(x = state, y = NO2_aqi, color = date_local)) +
+  geom_point() +
+  labs(x = "Staat", y = "NO2-AQI",
+       title = "NO2-AQI per staat") +
+  geom_smooth(method = "lm", se = TRUE) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1 ))
+```
+
+
+### Figuur 2: De NO2-AQI voor elke staat, over de volledige tijd gemeten. Wat opvalt is dat de waardes van Michigan (donker, midden) donkerder zijn dan de rest. Dit betekent dat er na verloop van tijd geen waardes meer zijn, of dat de NO2-AQI is gedaald. 
+
+#### Om aan te tonen of er na verloop van tijd geen waardes meer zijn, of dat de NO2-AQI is gedaald moet de NO2-AQI van alleen Michigan worden uitgezet tegen de tijd. Hier is een andere manier van plotten gebruikt (geen ggplot), om aan te geven dat plotten op meerdere manieren kan:
+
+```{r}
+plot(data_clear$date_local[data_clear$state=="Michigan"],  data_clear$NO2_aqi[data_clear$state=="Michigan"], main="NO2 Air Quality Index van Michigan",
+  xlab="Datum in Jaren", ylab="NO2 Air Quality Index")
+```
+
+
+### Figuur 3: De NO2-AQI van de staat Michigan, uitgezet tegen de tijd. Er is te zien dat er na 2007 geen metingen meer zijn gedaan. Dit verklaart de vorm in figuur 2. 
+
+
+#### Veel staten en steden hebben niet de volledige 16 jaar analyses gedaan. Soms ontbreekt er data. Dit is ook in de plotten terug te zien. Om echt betrouwbare conclusies te trekken zijn deze data wel nodig. Toch is met de beschikbare data plotten gewerkt en zijn plotten gevormd, om toch een indicatie te geven.
+
+
+#### Als we verder selecteren op een stad in Michigan, bijvoorbeeld Detroit dan is er te zien dat de data verkregen in deze stad ook maar tot ~2007 loopt.
+
+```{r}
+## Nu is alleen de NO2 AQI van de stad Detroit geselecteerd.
+plot(data_clear$date_local[data_clear$city=="Detroit"], data_clear$NO2_aqi[data_clear$city=="Detroit"], main="NO2 Air Quality Index van Detroit", xlab="Datum in Jaren", ylab="NO2 Air Quality Index")
+```
+
+
+### Figuur 4: De NO2-AQI van de stad Detroit, uitgezet tegen de tijd. De spreiding neemt af en de NO2 AQI lijkt minder te worden.
+
+```{r}
+plot(data_clear$date_local[data_clear$city=="Phoenix"], data_clear$NO2_aqi[data_clear$city=="Phoenix"], main="NO2 Air Quality Index van Phoenix", xlab="Datum in Jaren", ylab="NO2 Air Quality Index")
+```
+
+
+### Figuur 5: Verloop van NO2-AQI van de stad Phoenix. Hier is zichtbaar dat er wel voor het volledige tijdsbestek is gemeten. Ook hier lijkt de NO2 AQI minder te worden.
+
+
+#### Dit zijn nog geen fijne plotten om data uit af te lezen. Met GGplot kunnen fijnere grafieken worden geschetst. Omdat ggplot meer mogelijkheden heeft dan de methode voorheen, zijn de volgende plotten met ggplot gevormd.
+
+
+#### Omdat niet alle steden/staten over de gehele periode data hebben verzameld, is besloten om de AQI's van de gehele VS te pakken en te kijken of er een toe- of afname van de stoffen is in de tijd:
+
+```{r}
+# NO2-AQI van de gehele VS:
+ggplot(data = data_clear, 
+       aes(x = date_local, y = NO2_aqi, colour = NO2_aqi)) +
+  geom_point() +
+  geom_smooth() +
+  labs(x = "Tijdverloop in jaren", y = "NO2-AQI",
+       title = "Verloop NO2-AQI voor de gehele VS") +
+  theme_gray()
+```
+
+
+### Figuur 6: Verloop NO2-AQI voor de gehele VS.
+
+```{r}
+# SO2-AQI van de gehele VS:
+ggplot(data = data_clear,
+       aes(x = date_local, y = SO2_aqi, colour = SO2_aqi)) +
+  geom_point() +
+  geom_smooth() +
+  labs(x = "Tijdverloop in jaren", y = "SO2-AQI",
+       title = "Verloop SO2-AQI voor de gehele VS") +
+  theme_gray()
+```
+
+
+### Figuur 7: Verloop SO2-AQI voor de gehele VS.
+
+```{r}
+# O3-AQI van de gehele VS:
+ggplot(data = data_clear,
+       aes(x = date_local, y = O3_aqi, colour = O3_aqi)) +
+  geom_point() +
+  geom_smooth() +
+  labs(x = "Tijdverloop in jaren", y = "O3-AQI",
+       title = "Verloop O3-AQI voor de gehele VS") +
+  theme_gray()
+```
+
+
+### Figuur 8: Verloop O3-AQI voor de gehele VS.
+
+```{r}
+# CO-AQI van de gehele VS:
+ggplot(data = data_clear,
+        aes(x = date_local, y = CO_aqi, colour = CO_aqi)) +
+  geom_point() +
+  geom_smooth() +
+  labs(x = "Tijdverloop in jaren", y = "CO-AQI",
+       title = "Verloop CO-AQI voor de gehele VS") +
+  theme_gray()
+```
+
+
+### Figuur 9: Verloop CO-AQI voor de gehele VS.
+
+### Figuren 6 t/m 9: Het verloop van de AQI's per stof, van alle meetpunten. De trendlijn laat voor de stoffen NO2, SO2 en CO een duidelijke afname zien. De O3-AQI blijft redelijk constant. Wel is de gemiddelde AQI-waarde voor alle stoffen onder de 50, wat betekent dat het niet schadelijk is. Er zijn natuurlijk wel veel uitschieters, waardoor in sommige periodes een schadelijke hoeveelheid aanwezig is.
+
+
+#### De verzamelde data is gemeten in steden, in staten van de Verenigde Staten. Er kan worden ingezoomd vanuit de gehele VS, naar staten en steden apart. Dit is ook handig, omdat grote databestanden veel tijd kosten om te analyseren.
+
+### Het selecteren van data:
+```{r}
+data_sub <- data_clear[which(data_clear$city=='Detroit' | data_clear$city=='Phoenix'),]
+
+ggplot(data_sub, aes(x = date_local, y = NO2_aqi)) + 
+  aes(colour = city) +
+  stat_summary(fun.y = "mean", geom = "bar") +
+  labs(x = "Datum", y = "NO2 Air Quality Index", 
+              title = "Luchtkwaliteit van NO2 per stad over lange tijd") +
+  theme_gray()
+```
+
+
+### Figuur 10: Geselecteerde data kan geplot worden. In de volgende plot zijn enkele steden (Detroit en Phoenix) geselecteerd en is de NO2-AQI uitgezet over de tijd. Bij beide steden lijkt de NO2 AQI af te nemen. Dit wordt bevestigd door figuur 2 en 3.
+
+
+```{r}
+## Ook is het mogelijk om een plot te vormen van de data dat hoort bij de staat Arizona. 
+data_arizona <- data_clear[which(data_clear$state=="Arizona"),]
+
+ggplot(data = data_arizona, aes(x = date_local, y = O3_aqi)) +
+  aes(colour = city, fill = city) +
+  stat_summary(fun.y = "median", geom = "line") +
+  geom_smooth(aes(linetype = city), colour = "black") +
+  geom_blank() +
+  labs(x = "Jaar", y = "O3 Luchtkwaliteit",
+       title = "O3 Luchtkwaliteit voor staat Arizona")
+
+## Een andere manier van data selecteren is als volgt:
+data_300_600 <- data_clear[301:600,]
+## Hierbij wordt de data wat in de rijen 301 t/m 600 gebruikt, voor alle kolommen in die datasheet. Dit is niet uitgezet in een plot.
+```
+
+
+### Figuur 11: De O3-AQI is uitgezet tegen de tijd, voor elke stad in de staat Arizona. De 03 AQI lijkt voor elke stad in Arizona constant te blijven.
+
+```{r}
+## Er kan ook een selectie van staten worden gemaakt:
+data_Astaten <- data_clear[which(data_clear$state=="Arizona" | data_clear$state=="Alaska" | data_clear$state=="Alabama" | data_clear$state=="Arkansas"),]
+
+
+ggplot(data = data_Astaten, aes(x = date_local, y = O3_aqi)) +
+  aes(colour = state, fill = state) +
+  stat_summary(fun.y = "mean", geom = "line") +
+  labs(x = "Tijdsverloop", y = "O3 Air Quality Index",
+       title = "O3 AQI in steden van staten met de A") +
+  geom_smooth(aes(linetype = state), colour = "black") +
+  theme_gray()
+```
+
+
+### Figuur 12: De O3-AQI is uitgezet tegen de tijd, voor elke staat dat begint met de letter A. Om dat er in Alaska weinig metingen zijn gedaan is de trendlijn niet betrouwbaar. De 03 AQI in Arkansas en Arizona lijkt constant te zijn.
+
+
+```{r}
+## Er kan nog meer geselecteerd worden. Zo heeft een concentratie effect op de gezondheid, als de Air Quality Index boven de 50 is. Dit kan geselecteerd worden. Dezelfde "A-staten" zijn geselecteerd, maar nu worden alleen de waarden geplot waarbij de O3-AQI groter is dan 50:
+data_bad <- data_Astaten[which(data_Astaten$O3_aqi > 50),]
+
+ggplot(data = data_bad, aes(x = date_local, y = O3_aqi)) +
+  aes(colour = city, fill = city) +
+  stat_summary(fun.y = "mean", geom = "bar") +
+  labs(x = "Tijdsverloop", y = "O3 Air Quality Index",
+       title = "O3 AQI in steden van staten met de A") +
+  geom_smooth(aes(linetype = city), colour = "black") +
+  theme_gray()
+```
+
+
+### Figuur 13: Het verloop van de O3-AQI, voor de A-staten, waarbij O3-AQI groter is dan 50.
+
+### Codes om waardes te berekenen:
+```{r}
+# Er kan nagegaan worden wat de gemiddelde waardes van een stof voor een bepaalde staat zijn. Mean berekent het gemiddelde, de O3-AQI (O3_aqi) is geselecteerd. Vervolgens is de desbetreffende staat geselecteerd. Deze code berekent de gemiddelde waarde voor de O3-AQI van een staat:
+#mean(data_clear$O3_aqi[which(data_clear$state=="Alabama")],)             ### 36.8312
+#mean(data_clear$O3_aqi[which(data_clear$state=="Alaska")],)              ### 17.71255
+#mean(data_clear$O3_aqi[which(data_clear$state=="Arkansas")],)            ### 35.03521
+#mean(data_clear$O3_aqi[which(data_clear$state=="Arizona")],)             ### 39.00498
+#mean(data_clear$O3_aqi[which(data_clear$state=="California")],)          ### 35.72199
+#mean(data_clear$O3_aqi[which(data_clear$state=="Colorado")],)            ### 34.67504
+#mean(data_clear$O3_aqi[which(data_clear$state=="Connecticut")],)         ### 37.14981
+#mean(data_clear$O3_aqi[which(data_clear$state=="Country of Mexico")],)   ### NaN
+#mean(data_clear$O3_aqi[which(data_clear$state=="Delaware")],)            ### 35.41034
+#mean(data_clear$O3_aqi[which(data_clear$state=="District of Columbia")],)### NaN
+#mean(data_clear$O3_aqi[which(data_clear$state=="Florida")],)             ### 36.00015
+#mean(data_clear$O3_aqi[which(data_clear$state=="Georgia")],)             ### 34.48549
+#mean(data_clear$O3_aqi[which(data_clear$state=="Hawaii")],)              ### 26.66319
+#mean(data_clear$O3_aqi[which(data_clear$state=="Idaho")],)               ### 34.95633
+#mean(data_clear$O3_aqi[which(data_clear$state=="Illinois")],)            ### 31.98676
+#mean(data_clear$O3_aqi[which(data_clear$state=="Indiana")],)             ### 41.58949
+#mean(data_clear$O3_aqi[which(data_clear$state=="Iowa")],)                ### 33.8371
+#mean(data_clear$O3_aqi[which(data_clear$state=="Kansas")],)              ### 34.36298
+#mean(data_clear$O3_aqi[which(data_clear$state=="Kentucky")],)            ### 43.0185
+#mean(data_clear$O3_aqi[which(data_clear$state=="Louisiana")],)           ### 34.0191
+#mean(data_clear$O3_aqi[which(data_clear$state=="Maine")],)               ### 28.06908
+#mean(data_clear$O3_aqi[which(data_clear$state=="Maryland")],)            ### 36.866
+#mean(data_clear$O3_aqi[which(data_clear$state=="Massachusetts")],)       ### 25.9125
+#mean(data_clear$O3_aqi[which(data_clear$state=="Michigan")],)            ### 40.02296
+#mean(data_clear$O3_aqi[which(data_clear$state=="Minnesota")],)           ### 33.96188
+#mean(data_clear$O3_aqi[which(data_clear$state=="Missouri")],)            ### 41.90661
+#mean(data_clear$O3_aqi[which(data_clear$state=="Nevada")],)              ### 40.50227
+#mean(data_clear$O3_aqi[which(data_clear$state=="New Hampshire")],)       ### 34.54197
+#mean(data_clear$O3_aqi[which(data_clear$state=="New Jersey")],)          ### 34.31333
+#mean(data_clear$O3_aqi[which(data_clear$state=="New Mexico")],)          ### 41.32755
+#mean(data_clear$O3_aqi[which(data_clear$state=="New York")],)            ### 31.78274
+#mean(data_clear$O3_aqi[which(data_clear$state=="North Carolina")],)      ### 44.37039
+#mean(data_clear$O3_aqi[which(data_clear$state=="North Dakota")],)        ### 29.97895
+#mean(data_clear$O3_aqi[which(data_clear$state=="Ohio")],)                ### 31.71521
+#mean(data_clear$O3_aqi[which(data_clear$state=="Oklahoma")],)            ### 41.02914
+#mean(data_clear$O3_aqi[which(data_clear$state=="Oregon")],)              ### 25.16989
+#mean(data_clear$O3_aqi[which(data_clear$state=="Pennsylvania")],)        ### 39.71481
+#mean(data_clear$O3_aqi[which(data_clear$state=="Rhode Island")],)        ### 37.63291
+#mean(data_clear$O3_aqi[which(data_clear$state=="South Carolina")],)      ### 37.25643
+#mean(data_clear$O3_aqi[which(data_clear$state=="South Dakota")],)        ### 34.359
+#mean(data_clear$O3_aqi[which(data_clear$state=="Tennessee")],)           ### 45.36532
+#mean(data_clear$O3_aqi[which(data_clear$state=="Texas")],)               ### 35.8018
+#mean(data_clear$O3_aqi[which(data_clear$state=="Utah")],)                ### 42.29395
+#mean(data_clear$O3_aqi[which(data_clear$state=="Virginia")],)            ### 38.05446
+#mean(data_clear$O3_aqi[which(data_clear$state=="Washington")],)          ### 27.70539
+#mean(data_clear$O3_aqi[which(data_clear$state=="Wisconsin")],)           ### 27.3219
+#mean(data_clear$O3_aqi[which(data_clear$state=="Wyoming")],)             ### 41.44465
+
+## De drie staten met de hoogste O3-AQI-waardes zijn, aflopend: Tennessee > North Carolina > Kentucky. 
+## De staten met de laagste O3-AQI: Alaska < Oregon < Massachusetts.
+
+##Tennessee is met een gemiddelde O3-AQI van 45.4 koploper. Dit valt nog net binnen de "healthy-marge". Wel is dit de gemiddelde waarde, er zullen veel uitschieters in zitten waarbij het niveau wel gezondheidsrisico's heeft.
+  
+
+# Hetzelfde voor NO2-AQI, de gemiddelde waarde is per staat berekend:
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Alabama")],)             ### 21.2289
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Alaska")],)              ### 19.58097
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Arkansas")],)            ### 21.48777
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Arizona")],)             ### 36.10682
+#mean(data_clear$NO2_aqi[which(data_clear$state=="California")],)          ### 24.11434
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Colorado")],)            ### 35.96171
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Connecticut")],)         ### 18.45877
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Country of Mexico")],)   ### NaN
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Delaware")],)            ### 21.55776
+#mean(data_clear$NO2_aqi[which(data_clear$state=="District of Columbia")],)### NaN
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Florida")],)             ### 16.382
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Georgia")],)             ### 24.14663
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Hawaii")],)              ### 8.65374
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Idaho")],)               ### 23.33624
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Illinois")],)            ### 28.37883 
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Indiana")],)             ### 24.05516
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Iowa")],)                ### 14.29146
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Kansas")],)              ### 21.57833
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Kentucky")],)            ### 25.14282
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Louisiana")],)           ### 26.73898
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Maine")],)               ### 11.287
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Maryland")],)            ### 19.78108
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Massachusetts")],)       ### 29.77846 
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Michigan")],)            ### 31.85149
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Minnesota")],)           ### 15.87556
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Missouri")],)            ### 29.16636
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Nevada")],)              ### 23.94676
+#mean(data_clear$NO2_aqi[which(data_clear$state=="New Hampshire")],)       ### 14.66207
+#mean(data_clear$NO2_aqi[which(data_clear$state=="New Jersey")],)          ### 31.67709
+#mean(data_clear$NO2_aqi[which(data_clear$state=="New Mexico")],)          ### 24.46529
+#mean(data_clear$NO2_aqi[which(data_clear$state=="New York")],)            ### 30.58148
+#mean(data_clear$NO2_aqi[which(data_clear$state=="North Carolina")],)      ### 22.40422
+#mean(data_clear$NO2_aqi[which(data_clear$state=="North Dakota")],)        ### 12.42613
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Ohio")],)                ### 22.33624
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Oklahoma")],)            ### 14.89263
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Oregon")],)              ### 17.24415
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Pennsylvania")],)        ### 23.81281
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Rhode Island")],)        ### 14.37595
+#mean(data_clear$NO2_aqi[which(data_clear$state=="South Carolina")],)      ### 4.93653
+#mean(data_clear$NO2_aqi[which(data_clear$state=="South Dakota")],)        ### 11.07411
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Tennessee")],)           ### 3.554489
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Texas")],)               ### 23.56438
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Utah")],)                ### 23.48685
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Virginia")],)            ### 20.26661
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Washington")],)          ### 21.71784
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Wisconsin")],)           ### 26.16623
+#mean(data_clear$NO2_aqi[which(data_clear$state=="Wyoming")],)             ### 9.795768
+
+## Voor de NO2-AQI zijn de drie hoogst scorende steden: Arizona > Colorado > Michigan.
+## De steden met de laagste NO2-AQI: Tennessee < South Carolina < Hawaii.
+
+
+# Hetzelfde voor SO2-AQI:
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Alabama")],)             ### 7.005115
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Alaska")],)              ### 14.50607
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Arkansas")],)            ### 2.975883
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Arizona")],)             ### 4.212319
+#mean(data_clear$SO2_aqi[which(data_clear$state=="California")],)          ### 3.598922
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Colorado")],)            ### 10.60652
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Connecticut")],)         ### 3.222504
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Country of Mexico")],)   ### NaN
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Delaware")],)            ### 2.828383
+#mean(data_clear$SO2_aqi[which(data_clear$state=="District of Columbia")],)### NaN
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Florida")],)             ### 2.87637
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Georgia")],)             ### 1.793264
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Hawaii")],)              ### 2.284646
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Idaho")],)               ### 0.8231441
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Illinois")],)            ### 13.13234
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Indiana")],)             ### 14.66619
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Iowa")],)                ### 1.396194
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Kansas")],)              ### 9.391564
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Kentucky")],)            ### 18.55958
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Louisiana")],)           ### 11.3168
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Maine")],)               ### 2.988317
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Maryland")],)            ### 7.06301
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Massachusetts")],)       ### 8.006489
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Michigan")],)            ### 17.96873
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Minnesota")],)           ### 1.156951
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Missouri")],)            ### 18.31656
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Nevada")],)              ### 1.110607
+#mean(data_clear$SO2_aqi[which(data_clear$state=="New Mexico")],)          ### 1.179171
+#mean(data_clear$SO2_aqi[which(data_clear$state=="New York")],)            ### 14.06571
+#mean(data_clear$SO2_aqi[which(data_clear$state=="North Carolina")],)      ### 8.604396
+#mean(data_clear$SO2_aqi[which(data_clear$state=="North Dakota")],)        ### 0.4123412
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Ohio")],)                ### 15.37234
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Oklahoma")],)            ### 3.744515
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Oregon")],)              ### 2.035266
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Pennsylvania")],)        ### 15.80361
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Rhode Island")],)        ### 1.668987
+#mean(data_clear$SO2_aqi[which(data_clear$state=="South Carolina")],)      ### 4.758874
+#mean(data_clear$SO2_aqi[which(data_clear$state=="South Dakota")],)        ### 0.6693936
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Tennessee")],)           ### 2.329678
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Texas")],)               ### 4.6741
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Utah")],)                ### 1.151823
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Virginia")],)            ### 9.857911
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Washington")],)          ### 1.946058
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Wisconsin")],)           ### 8.27683
+#mean(data_clear$SO2_aqi[which(data_clear$state=="Wyoming")],)             ### 1.815087
+  
+## De drie steden met de hoogste SO2-AQI: Kentucky > Missouri > Michigan.
+## De drie steden met de laagste SO2-AQI: North Dakota < South Dakota < Idaho.
+
+
+# Ook voor CO is het gemiddelde berekend van de staten:
+#mean(data_clear$CO_aqi[which(data_clear$state=="Alabama")],)             ### 3.851662
+#mean(data_clear$CO_aqi[which(data_clear$state=="Alaska")],)              ### 6.52834
+#mean(data_clear$CO_aqi[which(data_clear$state=="Arkansas")],)            ### 5.929914
+#mean(data_clear$CO_aqi[which(data_clear$state=="Arizona")],)             ### 9.190681
+#mean(data_clear$CO_aqi[which(data_clear$state=="California")],)          ### 7.405755
+#mean(data_clear$CO_aqi[which(data_clear$state=="Colorado")],)            ### 7.724804
+#mean(data_clear$CO_aqi[which(data_clear$state=="Connecticut")],)         ### 3.586396
+#mean(data_clear$CO_aqi[which(data_clear$state=="Country of Mexico")],)   ### NaN
+#mean(data_clear$CO_aqi[which(data_clear$state=="Delaware")],)            ### 3.839384
+#mean(data_clear$CO_aqi[which(data_clear$state=="District of Columbia")],)### NaN
+#mean(data_clear$CO_aqi[which(data_clear$state=="Florida")],)             ### 5.921593
+#mean(data_clear$CO_aqi[which(data_clear$state=="Georgia")],)             ### 5.273057
+#mean(data_clear$CO_aqi[which(data_clear$state=="Hawaii")],)              ### 4.481693
+#mean(data_clear$CO_aqi[which(data_clear$state=="Idaho")],)               ### 2.875546
+#mean(data_clear$CO_aqi[which(data_clear$state=="Illinois")],)            ### 6.258057
+#mean(data_clear$CO_aqi[which(data_clear$state=="Indiana")],)             ### 5.395001
+#mean(data_clear$CO_aqi[which(data_clear$state=="Iowa")],)                ### 3.043162
+#mean(data_clear$CO_aqi[which(data_clear$state=="Kansas")],)              ### 6.541608
+#mean(data_clear$CO_aqi[which(data_clear$state=="Kentucky")],)            ### 3.178455
+#mean(data_clear$CO_aqi[which(data_clear$state=="Louisiana")],)           ### 6.311275
+#mean(data_clear$CO_aqi[which(data_clear$state=="Maine")],)               ### 3.087199
+#mean(data_clear$CO_aqi[which(data_clear$state=="Maryland")],)            ### 4.369735
+#mean(data_clear$CO_aqi[which(data_clear$state=="Massachusetts")],)       ### 5.540044
+#mean(data_clear$CO_aqi[which(data_clear$state=="Michigan")],)            ### 6.469956
+#mean(data_clear$CO_aqi[which(data_clear$state=="Minnesota")],)           ### 3.450673
+#mean(data_clear$CO_aqi[which(data_clear$state=="Missouri")],)            ### 7.41318
+#mean(data_clear$CO_aqi[which(data_clear$state=="Nevada")],)              ### 3.65688
+#mean(data_clear$CO_aqi[which(data_clear$state=="New Hampshire")],)       ### 5.073181
+#mean(data_clear$CO_aqi[which(data_clear$state=="New Jersey")],)          ### 6.437528
+#mean(data_clear$CO_aqi[which(data_clear$state=="New Mexico")],)          ### 3.479843
+#mean(data_clear$CO_aqi[which(data_clear$state=="New York")],)            ### 5.65791
+#mean(data_clear$CO_aqi[which(data_clear$state=="North Carolina")],)      ### 5.628313
+#mean(data_clear$CO_aqi[which(data_clear$state=="North Dakota")],)        ### 2.053358
+#mean(data_clear$CO_aqi[which(data_clear$state=="Ohio")],)                ### 4.010115
+#mean(data_clear$CO_aqi[which(data_clear$state=="Oklahoma")],)            ### 2.486941
+#mean(data_clear$CO_aqi[which(data_clear$state=="Oregon")],)              ### 5.32316
+#mean(data_clear$CO_aqi[which(data_clear$state=="Pennsylvania")],)        ### 3.986082
+#mean(data_clear$CO_aqi[which(data_clear$state=="Rhode Island")],)        ### 3.162025
+#mean(data_clear$CO_aqi[which(data_clear$state=="South Carolina")],)      ### 1.604651
+#mean(data_clear$CO_aqi[which(data_clear$state=="South Dakota")],)        ### 2.385948 
+#mean(data_clear$CO_aqi[which(data_clear$state=="Tennessee")],)           ### 4.878684
+#mean(data_clear$CO_aqi[which(data_clear$state=="Texas")],)               ### 4.450385
+#mean(data_clear$CO_aqi[which(data_clear$state=="Utah")],)                ### 5.413475
+#mean(data_clear$CO_aqi[which(data_clear$state=="Virginia")],)            ### 5.359833
+#mean(data_clear$CO_aqi[which(data_clear$state=="Washington")],)          ### 2.73029
+#mean(data_clear$CO_aqi[which(data_clear$state=="Wisconsin")],)           ### 5.248021
+#mean(data_clear$CO_aqi[which(data_clear$state=="Wyoming")],)             ### 1.486047
+
+## De drie steden met de hoogste CO-AQI: Arizona > Colorado > Missouri.
+## De drie steden met de laagste CO-AQI: Wyoming < South Carolina < North Dakota.
+
+# Overzicht van de luchtvervuiling van de drie meest- en minst vervuilde staten:
+#          Hoogste Air Quality Index                     Laagste Air Quality Index
+## O3:   Tennessee > North Carolina > Kentucky      Alaska < Oregon < Massachusetts
+## NO2:  Arizona > Colorado > Michigan              Tennessee < South Carolina < Hawaii
+## SO2:  Kentucky > Missouri > Michigan             North Dakota < South Dakota < Idaho
+## CO:   Arizona > Colorado > Missouri              Wyoming < South Carolina < North Dakota
+```
+
+### Vormgeven in een plot:
+```{r}
+# Er is nu bekend per stof welke staten gemiddeld het best en het slechts presteren. Dit kan uitgezet worden in een grafiek:
+
+# Voor CO-AQI:
+data_slechtstCO <- data_clear[which(data_clear$state=='Arizona' | data_clear$state=='Colorado' | data_clear$state=='Missouri'),]
+
+ggplot(data = data_slechtstCO, aes(x = date_local, y = CO_aqi)) +
+  aes(colour = state, fill = state) +
+  stat_summary(fun.y = "mean", geom = "bar") +
+  labs(x = "Tijdverloop", y = "CO Air Quality Index",
+       title = "Drie meest vervuilde staten voor CO-AQI") +
+  geom_smooth(aes(linetype = state), colour = "black") +
+  theme_gray()
+```
+
+
+### Figuur 14: De drie staten met de hoogste CO-AQI, uitgezet tegen de tijd. In de staten met gemiddeld de hoogste CO AQI neemt deze na verloop van tijd af.
+
+```{r}
+data_besteCO <- data_clear[which(data_clear$state=='Wyoming' | data_clear$state=='South Carolina' | data_clear$state=='North Dakota'),]
+
+ggplot(data = data_besteCO, aes(x = date_local, y = CO_aqi)) +
+  aes(colour = state, fill = state) +
+  stat_summary(fun.y = "mean", geom = "bar") +
+  labs(x = "Tijdverloop", y = "CO Air Quality Index",
+       title = "Drie minst vervuilde staten voor O3-AQI") +
+  geom_smooth(aes(linetype = state), colour = "black") +
+  theme_gray()
+```
+
+
+### Figuur 15: De drie staten met de laagste CO-AQI, uitgezet tegen de tijd. In de minst vervuilde staten schommelt de trendlijn van de CO AQI. DIt is een gevolg van ontbrekende data. Het is daarom mogelijk dat dit niet de minst vervuilde staten zijn voor CO, omdat er data ontbreekt. Dit bevestigt het belang van het gebruik van een volledige dataset. 
+
+#### Door de factoren aan te passen (naar NO2, SO2 of O3) en de daarbij horende staten, kunnen voor die stoffen dezelfde plotten worden gemaakt.
+
+#### Door te selecteren kan per staat weer worden gekeken welke steden daarin het best of slechts presteren, per luchtvervuilende stof.
+
+
+
+
+# Conclusie
+#### Met behulp van Rstudio is een grote dataset ontleed en onderzocht. De dataset is opgeschoond en/of geselecteerd, waarna er plotten zijn gemaakt die een indruk geven over de luchtvervuiling in de Verenigde Staten.
+
+
+#### In de plotten van de stoffen apart (figuren 6 t/m 9) is te zien dat het NO2-, SO2- en CO-gehalte daalt naarmate de jaren verstrijken. Het O3-gehalte blijft redelijk constant.
+
+####Enkele plotten zijn gemaakt om in te zoomen in de VS:
+#### - Zo is bevestigd dat het NO2-gehalte in Detroit en Phoenix dalen.
+#### - Dat het O3-gehalte in Arizona redelijk constant blijft, wat de trend in de gehele VS opvolgt.
+#### - Voor andere stoffen hoeft slechts de code veranderd te worden om daar inzicht in te krijgen. Dit is niet gedaan, om het overzicht te bewaren.
+  
+### Hoofdvraag: 
+#### Kunnen we inzicht krijgen in de luchtvervuiling in de Verenigde Staten gebruikmakend van R.
+
+#### JA dat kan. Met Rstudio is het mogelijk om met verschillende functies overzichten te verkrijgen die specifiek iets kunnen zeggen over de data. Zo is het mogelijk om met Rstudio data te subsetten, seleteren of samen te vatten om plots te verkrijgen die informatie kunnen geven over specifieke onderdelen van een grote dataset, zoals in dit geval de luchtvervuiling per staat of zelfs steden afzonderlijk.
+
+### Deelvragen: 
+#### 1) Welke luchtvervuilende stof komt het meeste voor?
+
+#### Antwoord: Het O3-gehalte is in de VS het hoogst.
+
+#### 2) In welke staat komt het meest van de vervuilende stoffen voor? 
+
+#### Antwoord:  
+#### O3: Tennessee
+#### NO2: Arizona
+#### SO2:Kentucky
+#### CO: Arizona
+  
+#### Zo lijkt het alsof Arizona de meest vervuilde staat is. Het is wenselijk om een plot te hebben waarin de 4 stoffen in alleen Arizona zijn uitgezet, voor het volledige verloop van tijd.
+
+#### 3) vindt er een toename of afname plaats in verloop van tijd van de vier vervuilende stoffen?
+  
+#### In de plotten van de stoffen apart is te zien dat het NO2-, SO2- en CO-gehalte daalt naarmate de jaren verstrijken. Het O3-gehalte blijft redelijk constant. Geen wonder dat Donald Trump niet in klimaatverandering geloofd als hij de data van zijn land bekijkt.
+  
+
+# Discussie
+
+#### Allereerst is het van belang dat de dataset compleet is. Voor ons doen is het zoveel mogelijk opgeschoond, echter bleek dat er periodes zijn geweest waarin sommige staten/steden geen metingen hebben uitgevoerd. Hierdoor zijn sommige plotten niet compleet, waardoor doorslaggevende conclusies niet getrokken kunnen worden. Echter zijn wij hier wel mee doorgegaan om toch te laten zien hoe handig Rstudio is voor het verwerken van data.
+
+
+#### In sommige gevallen is gekozen voor de stof NO2, een andere keer O3 of CO. Dit omdat wij vonden dat het in dat geval een nuttige plot opleverde waarmee wij iets konden laten zien over die waardes.
+
+
+#### Wij hadden graag meer plotten willen maken, om zo eventueel meer of andere conclusies te kunnen trekken, maar vanwege de grootte van het bestand hebben wij besloten hiervan af te wijken. Wel is toegelicht hoe de codes eenvoudig aangepast kunnen worden om alsnog die plotten zichtbaar te maken.
+  
+

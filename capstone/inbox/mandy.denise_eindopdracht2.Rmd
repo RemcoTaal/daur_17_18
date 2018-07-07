@@ -1,0 +1,401 @@
+---
+title: "Capstone assignment"
+author: "Marc A.T. Teunis"
+date: "`r Sys.Date()`"
+output: html_document
+---
+<style>
+
+.footer {
+    font-size: 16pt;
+    color: Black;
+    font-family: 'Helvetica'
+    content: attr(label);
+    position: absolute;
+    margin-left: auto;
+    margin-right: auto;
+    left: 0;
+    right: 0;
+    text-align:center;
+    bottom: 10px;
+    line-height: 1.9;
+    display: block;
+}
+
+</style>
+
+<div class="footer" style="margin-top;font-size:120%;"> 
+Data Analysis Using R - November 2017 </div>
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.width = 5, fig.height = 3,
+                      message = FALSE, error = FALSE, warning = FALSE)
+```
+
+```{r, root_1, include=FALSE}
+## defines the root of the project for later use
+require("rprojroot") || utils::install.packages("rprojroot")
+library(rprojroot)
+root <- find_root_file(criterion = is_rstudio_project)
+```
+
+## Capstone definition
+
+ - A coping stone :coping
+ - The high point :crowning achievement
+
+"..the capstone of her career.."
+
+```{r, out.width="300px", echo=FALSE, eval=FALSE}
+knitr::include_graphics(path = file.path(root, "images", "keystone.gif"))
+```
+
+## Capstone in this course
+
+ - A showcase that you've learned how to use R in _every_ element of the data cycle
+ - No statistical analysis
+ - Focus on read, clean and explore data
+ - Final product: An \*.Rmd (and corresponding rendered \*.html) file with your analysis sent to me by email **BEFORE** the deadline.
+ 
+## Practical aspects
+ 
+ - Deadline 2 February 23:59 hrs., 2018
+ - Use this presentation-file "./capstone/capstone_assignment" to make the assignment
+ - Questions by email, and face-to-face by appointment only (tutor-slots)
+ - Work in pairs, explain your code to each-other, discuss steps you made, integrate you work in one analysis document
+ 
+# The data
+ - `Toxcast`
+
+## Toxcast data
+
+Difficulty: **
+
+ - Toxcast dataset in the folder "./capstone/data/toxcast"
+ 
+
+# The assignment
+
+## Introduction
+Write a short (max 300 words) introduction that explains some of the details of the data you are analyzing for your capstone assignment
+
+ - The type of data
+ 
+ - The 'experiment' or variables
+ - The source of the data
+ - The anticipated results or aim of the analysis: Which (research) question is being addressed
+ 
+```{r}
+## Het doel van deze opdracht is het kunnen gebruiken en begrijpen van het dataverwerkingsprogramma R-studio. Hiervoor wordt EPA’s meest bijgewerkte, openbaar beschikbare high-throughput toxiciteits data set van duizenden chemicaliën gebruikt. Deze gegevens worden gegenereerd via de ToxCast-research effort van de EPA. Voor het onderzoek van deze opdracht worden de minimale dosis (ldt) en de maximale dosis (hdt) in mg/kg/dag bij verschillende diersoorten (Species) vergeleken. Hierbij wordt de dosis tegenover de diersoorten uitgezet. Dit zelfde wordt gedaan voor de dosis geanalyseerd op het begin (dosis_start) en op eind (dosis_end) van de studie. De onderzoeksvraag die hierbij gesteld wordt is: Wat voor effect heeft het diersoort op de maximale, minimale, begin en eind dosis van chemicalien? De gekregen waardes worden geplot waarbij figuren te zien zijn. De resultaten worden uitgezet in grafieken en zullen worden besproken in de hoofdstukken resultaten en conclusie. Vervolgens zal het bestand in R-studio worden omgezet naar een HTML file, waarna ze verzonden kunnen worden via de mail.
+```
+
+ 
+## Reading data into R
+
+ - Import the data into R with a code-chunk 
+ - If zipped unzip the data with R before loading
+ - User `relative` paths so that your code is portable
+
+```{r}
+library(readr)
+
+path_to_file <- file.path(root, "capstone", "data", "toxcast", "toxrefdb_nel_lel_noael_loael_summary_AUG2014_FOR_PUBLIC_RELEASE.csv")
+
+data_toxcast = read.csv(file = path_to_file)
+```
+ 
+## Inspect the integrity of the data
+
+ - Write a code chunk that checks the data, number of rows, number of variables, names of the variables, data-type of the variable
+```{r}
+##check the number of rows
+nrow(data_toxcast)
+```
+ 
+```{r}
+##check the number of variable
+ncol(data_toxcast)
+```
+
+```{r}
+##check the names of the variables
+names(data_toxcast)
+```
+
+```{r}
+##checks the number of rows and variables
+dim(data_toxcast)
+```
+
+```{r}
+##check the data type of the variables used (ldt ; hdt ; dose_start ; dose_end ; species)
+class(data_toxcast$ldt)
+class(data_toxcast$hdt)
+class(data_toxcast$dose_start)
+class(data_toxcast$dose_end)
+class(data_toxcast$species)
+
+# three data are not a factor but
+data_toxcast$dose_start <- as.numeric(as.factor(data_toxcast$dose_start))
+data_toxcast$dose_end <- as.numeric(as.factor(data_toxcast$dose_end))
+
+class(data_toxcast$dose_start)
+class(data_toxcast$dose_end)
+```
+ 
+ - Create a summary statistics of each variable that shows confidence intervals, max, min, mean, median values
+ 
+```{r}
+# NA check
+sum(is.na(data_toxcast$ldt))
+sum(is.null(data_toxcast$ldt))
+sum(is.na(data_toxcast$hdt))
+sum(is.null(data_toxcast$hdt))
+sum(is.na(data_toxcast$dose_start))
+sum(is.null(data_toxcast$dose_start))
+sum(is.na(data_toxcast$dose_end))
+sum(is.null(data_toxcast$dose_end))
+sum(is.na(data_toxcast$species))
+sum(is.null(data_toxcast$species))
+
+a <- data.frame(data_toxcast$ldt)
+b <- data.frame(data_toxcast$hdt)
+c <- data.frame(data_toxcast$dose_start)
+d <- data.frame(data_toxcast$dose_end)
+e <- data.frame(data_toxcast$species)
+
+## observations for ldt
+nrow(a)
+ncol(a)
+names(a)
+str(a)
+max(a)
+min(a)
+
+# observation for hdt
+
+nrow(b)
+ncol(b)
+names(b)
+str(b)
+max(b)
+min(b)
+
+# observation for dose_start
+
+nrow(c)
+ncol(c)
+names(c)
+str(c)
+max(c)
+min(c)
+
+# observation for dose_end
+
+nrow(d)
+ncol(d)
+names(d)
+str(d)
+max(d)
+min(d)
+
+# observation for species
+
+nrow(e)
+ncol(e)
+names(e)
+str(e)
+```
+
+ 
+Create code that asserts the data-type of each variable
+ 
+## Tidy data
+
+ - Write a code chunk that creates a tidy dataframe:
+  * Each variable in it's own column (long format)
+  * Each row has it's own observation
+  * Each value has it's own cell
+  * Variable names are all lowercase and snake_case and have a short descriptive name
+ - Reshape the data if necessary
+ 
+```{r}
+data.frame(data_toxcast$ldt, data_toxcast$hdt, data_toxcast$dose_start, data_toxcast$dose_end, data_toxcast$species)
+
+
+library(ggplot2)
+```
+ 
+
+
+## Select, Filter, Mutate, Summarize
+
+ - Select proper variables
+ - Filter values if needed
+ - Create new variables with `dplyr::mutate()` if needed
+ - Summarize the data by grouping variables and calculate mean values
+
+```{r}
+# scatter plot for ldt vs species
+library(ggplot2)
+palette()
+
+plot_1a <-  ggplot(data = data_toxcast) +
+  geom_point(mapping = aes(x = ldt , y = species, color = species)) +
+  geom_jitter(aes(x = ldt, y = species), position = "jitter") +
+  ggtitle("ldt of different species") +
+  ylab("species (animals)") +
+  xlab("ldt (mg/kg/day")
+  
+  
+plot_1a
+```
+
+```{r}
+# scatter filter for ldt vs species
+library(dplyr)
+filter_data_1 <- data_toxcast %>%
+  filter(ldt <= 10)
+
+plot_1a_1 <- ggplot(data = filter_data_1) +
+  geom_point(mapping = aes(x = ldt, y = species, color = species)) +
+  geom_jitter(aes(x = ldt, y = species), position = "jitter") +
+  ggtitle("animal species by a low dose tested") +
+  xlab("ldt (mg/kg/day)") +
+  ylab("species (animals)")
+
+plot_1a_1
+```
+
+
+
+```{r}
+# scatter plot for hdt vs species
+plot_1b <-  ggplot(data = data_toxcast) +
+  geom_point(mapping = aes(x = hdt , y = species, color = species)) +
+  geom_jitter(aes(x = hdt, y = species), position = "jitter") +
+  ggtitle("hdt of different species") +
+  ylab("species (animals)") +
+  xlab("hdt (mg/kg/day")
+  
+plot_1b
+```
+
+```{r}
+# scatter filter for hdt vs species
+filter_data_2 <- data_toxcast %>%
+  filter(hdt <= 10)
+
+plot_1b_1 <- ggplot(data = filter_data_2) +
+  geom_point(mapping = aes(x = hdt, y = species, color = species)) +
+  geom_jitter(aes(x = hdt, y = species), position = "jitter") +
+  ggtitle("animal species by a high dose tested") +
+  xlab("hdt (mg/kg/day)") +
+  ylab("species (animals)")
+
+plot_1b_1
+```
+
+
+
+```{r}
+# scatter plot for start_dose vs species
+plot_1c <-  ggplot(data = data_toxcast) +
+  geom_point(mapping = aes(x = dose_start , y = species, color = species)) +
+  geom_jitter(aes(x = dose_start, y = species), position = "jitter") +
+  ggtitle("start dose of different species") +
+  ylab("species (animals)") +
+  xlab("dose_start (week/day/month/GD")
+  
+plot_1c
+```
+
+```{r}
+# scatter filter for start_dose vs species
+filter_data_3 <- data_toxcast %>%
+  filter(dose_start <= 50)
+
+plot_1c_1 <- ggplot(data = filter_data_3) +
+  geom_point(mapping = aes(x = dose_start, y = species, color = species)) +
+  geom_jitter(aes(x = dose_start, y = species), position = "jitter") +
+  ggtitle("The start dose by different species") +
+  xlab("dose_start (week/day/month/GD)") +
+  ylab("species (animals)")
+
+plot_1c_1
+```
+
+
+```{r}
+# scatter plot for dose_end vs species
+plot_1d <-  ggplot(data = data_toxcast) +
+  geom_point(mapping = aes(x = dose_end , y = species, color = species)) +
+  geom_jitter(aes(x = dose_end, y = species), position = "jitter") +
+  ggtitle("end dose of different species") +
+  ylab("species (animals)") +
+  xlab("dose_end (week/day/month/GD")
+
+  
+plot_1d
+```
+
+
+```{r}
+# scatter filter for start_dose vs species
+filter_data_4 <- data_toxcast %>%
+  filter(dose_end <= 500)
+
+plot_1d_1 <- ggplot(data = filter_data_3) +
+  geom_point(mapping = aes(x = dose_end, y = species, color = species)) +
+  geom_jitter(aes(x = dose_end, y = species), position = "jitter") +
+  ggtitle("The end dose by different species") +
+  xlab("dose_end (week/day/month/GD)") +
+  ylab("species (animals)")
+  
+
+plot_1d_1
+```
+
+ 
+## Exploratory data analysis
+Create at least four (4) graphs that show some sort of relationship between variables present in the data
+
+**For example:**
+
+ - Use colours to isolate groups in the data
+ - Use facets to show groups in the data
+ - Use diffrent types of graphs (e.g. `geom_point`, `geom_line`, `geom_bar`, `scale_fille_gradient` )
+ - Provide a graph that indicates information on the distribution of your data
+ 
+## Graph criteria
+
+ - The graph has a descriptive title
+ - The axes have units and decriptive _short_ titles
+ - The graph is visually appealing and the scale is correct
+ 
+## Results
+
+ - Write a short paragraph (max 500 words) on your resulting graphs.
+ - What does the reader have to take away from the graphs you've shown?
+ 
+```{r}
+## Er worden 8 figuren geshowd in dit document. In de eerste twee figuren is het laagst geteste dosis uitgezet tegen de diersoorten, in het derde en vierde figuur is het hoogst geteste dosis uitgezet tegen de diersoorten, in het vijfde en zesde figuur is de start dosis weergegeven en in de laatste twee de eind dosis. Het verschil tussen de twee is de filter waardoor het verschil beter zichtbaar wordt. Te zien is dat bij het diersoort ‘rat’ de hoogste dosis wordt aangetroffen, gevolgd door de muis en hond. Dit resultaat is te verklaren door de hoge start en eind dosis welke aanwezig is in de rat, muis en hond. 
+
+##Tevens is er een kleur aan de grafieken toegevoegd. De kleur geeft het diersoort aan en is toegevoegd om een beter beeld weer te geven.
+```
+ 
+
+
+**_Tell a data-story!_**
+
+## Conclusion
+
+ - Refer to the introduction and write a short (max 200 words) conclusion on you analysis  - Identify gaps in you analysis
+ - What still needs to be done? / What is lacking?
+ 
+```{r}
+# Om achter het doel; welk diersoort wordt het zwaarste blootgesteld aan verschillende chemicaliën? Is in dit onderzoek gekeken naar de maximale en minimale dosis en de toediening van chemicaliën aan het begin en eind. Er is gebleken dat ratten het zwaarst worden blootgesteld aan verschillende chemicaliën zowel op het begin als op het eind. 
+
+# Welke chemicaliën hier verantwoordelijk voor zijn en of dit afhankelijk is van de toedieningtijd (week/dag/maand) , is een aanrader voor een vervolg onderzoek. 
+
+```
+
