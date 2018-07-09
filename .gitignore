@@ -2,3 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
+demo_script.R
+demo_rmd.html
+demo_rmd.Rmd

@@ -28,7 +28,7 @@ output:
 </style>
 
 <div class="footer" style="margin-top;font-size:120%;"> 
-Using R in Life Sciences - Janaury 2018 </div>
+Data Analysis Using R - `r Sys.Date()` </div>
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, fig.width = 5, fig.height = 3)
@@ -113,7 +113,7 @@ names(flights)
 
 ## Factor levels (grouping variable)
 ```{r}
-flights$year
+flights$year %>% unique()
 flights$year <- as.factor(flights$year)
 levels(flights$year)
 ```
@@ -121,7 +121,7 @@ levels(flights$year)
 ## The actual filtering (January 1st)
 "January 1st" equals to `flights$month == 1 & flights$day == 1`
 ````{r}
-?dplyr::filter
+# ?dplyr::filter  calls the help file for this function
 january_1st <- filter(flights, month == 1 & day == 1)
 january_1st
 ```
